@@ -1,0 +1,2 @@
+!P.BACKGROUND = 255
+!P.COLOR = 0
