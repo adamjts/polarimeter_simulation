@@ -36,7 +36,24 @@ class SourceMLMirror():
 
 
 	def __str__(self):
-		return "Geometry: " + str(self.geometry) + "\nDistance between components: " + str(self.sourcePos[2]) + "mm"
+		report = "CURRENT SETUP\n"
+
+		report += "Mirror:\n" 
+
+		report += "    -center: " + str(self.mirror.geometry['center']) + "\n"
+		report += "    -norm: "+ str(self.mirror.geometry['plane']) + "\n"
+		
+		report += " \n \n"
+		report += "Source:\n"
+		report += "    -position: " + str(self.sourcePos)+ "\n"
+		report += "    -direction: " + str(self.sourceDirection)+ "\n"
+		report += "    -solid angle: " + str(self.delta) + " steradians"+ "\n"
+
+		report += "\n \n RAW: \n"
+		report += str(self.mirror.geometry)
+
+		return report
+			
 
 	def generate_photons(self, exposureTime, flux=100, V=10, I=0.1):
 		# Generate Initial Photons
@@ -60,8 +77,25 @@ class SourceMLMirror():
 		rowsToRemove = np.array(rowsToRemove)
 		photons.remove_rows(rowsToRemove)
 
-
 		return reflectedPhotons
 
-	#def rotate_mirror(rotationMatrix):
-		#self.mirror = MultiLayerMirror(self.reflFile, self.testedPolarization, #position=np.array([0, 0, 0]), orientation=np.dot( rotationMatrix, euler2mat(0, 0, np.pi/4, 'syxz'))
+	def offset_mirror_orientation(self, rotationMatrix):
+		self.mirror = MultiLayerMirror(self.reflFile, self.testedPolarization,
+			position=np.array([0, 0, 0]), orientation=np.dot(rotationMatrix,euler2mat(0, 0, np.pi/4, 'syxz')))
+
+	def offset_mirror_position(self, position):
+		position = np.array(position)
+		self.mirror = MultiLayerMirror(self.reflFile, self.testedPolarization,
+			position=position, orientation=euler2mat(0, 0, np.pi/4, 'syxz'))
+
+	def move_mirror_position(self, displacement):
+		displacement = displacement + [0]
+		self.mirror.geometry['center'] += np.array(displacement)
+
+	def move_mirror_orientation(self,rotationMatrix):
+
+
+
+
+
+
