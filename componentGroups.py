@@ -20,18 +20,28 @@ class SourceMLMirror():
 	#this will also alllow the elements to wiggle later. RN it goes light source --> MLMirror
 	# The mirror is at the center of this object
 	def __init__(self, reflFile, testedPolarization, openningAngle, sourceDistance = 500, **kwargs):
+		'''Default Setup:
+		Z is out of the screen. X+ is to the right. Y+ is upwards.
 
+		   Source
+		   	|
+		   	|
+		   	|
+		   	MLMirror------>
+		'''
         # parameters for coneSource -- THESE WILL ALL BE WOBBLED LATER
-		self.sourcePos = [0,sourceDistance, 0]
+		self.sourcePos = [0, sourceDistance , 0]
 		self.sourceDirection = [0,-1,0]
 		self.delta = openningAngle/2 
 
 		#mirrorData
 		self.reflFile = reflFile
 		self.testedPolarization = testedPolarization
+		self.defaultOrientation = euler2mat(-np.pi/4, 0, 0, 'syxz')
+		self.defaultOrientation = np.dot(euler2mat(0,-np.pi/2,0,'syxz'),self.defaultOrientation)
 		# Generate Mirror
 		self.mirror = MultiLayerMirror(self.reflFile, self.testedPolarization,
-        position=np.array([0, 0, 0]), orientation=euler2mat(0, 0, np.pi/4, 'syxz'))
+        position=np.array([0, 0, 0]), orientation=self.defaultOrientation) #should rotate about y
 
 
 
@@ -80,19 +90,31 @@ class SourceMLMirror():
 		return reflectedPhotons
 
 	def offset_mirror_orientation(self, rotationMatrix):
+		# This is used to rotate the mirror relative to its default orientation
+		rotationMatrix = np.array(rotationMatrix)
 		self.mirror = MultiLayerMirror(self.reflFile, self.testedPolarization,
-			position=np.array([0, 0, 0]), orientation=np.dot(rotationMatrix,euler2mat(0, 0, np.pi/4, 'syxz')))
+			position=np.array([0, 0, 0]), orientation=np.dot(rotationMatrix,self.defaultOrientation))
 
 	def offset_mirror_position(self, position):
+		# This is used to place the mirror relative to its default position
 		position = np.array(position)
 		self.mirror = MultiLayerMirror(self.reflFile, self.testedPolarization,
-			position=position, orientation=euler2mat(0, 0, np.pi/4, 'syxz'))
+			position=position, orientation=self.defaultOrientation)
+
+	def move_mirror_orientation(self,rotationMatrix):
+		# This is used to rotate the mirror relative to its current orientation
+		#NOT DONE. 
+		rotationMatrix = np.array(rotationMatrix)
+
+		#Find matrix necessary to get it to its current position. Then dot these.
+		#in other words... firs find the matrix which maps [1,0,0] to mirror.geometry['plane']
 
 	def move_mirror_position(self, displacement):
+		# This is used to move the mirror relative to its current position
 		displacement = displacement + [0]
 		self.mirror.geometry['center'] += np.array(displacement)
 
-	def move_mirror_orientation(self,rotationMatrix):
+
 
 
 
