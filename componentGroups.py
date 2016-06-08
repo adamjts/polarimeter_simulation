@@ -21,16 +21,20 @@ class SourceMLMirror():
 	#this will also alllow the elements to wiggle later. RN it goes light source --> MLMirror
 	# The mirror is at the center of this object
 
-	def defaultSource(openningAngle, sourceDistance):
+	def defaultSource(self, openningAngle, sourceDistance):
+
+		self.defaultSourcePosition = [0, sourceDistance,0]
+		self.defaultSourceDirection = [0,-1,0]
+
 		# Generate Source
 		flux=100
 		V=10
 		I=0.1
 		energies = createEnergyTable('C', V_kV = V, I_mA = I) 
-		source = LabPointSourceCone([0, sourceDistance , 0], delta = openningAngle , energy= energies, direction = [0,-1,0], flux = flux) # Generate photons from original source
+		source = LabPointSourceCone(self.defaultSourcePosition, delta = openningAngle , energy= energies, direction = self.defaultSourceDirection, flux = flux) # Generate photons from original source
 		return source
 
-	def defaultMirror(reflFile, testedPolarization):
+	def defaultMirror(self,reflFile, testedPolarization):
 		#mirrorData Defaults - reference files
 		self.reflFile = reflFile
 		self.testedPolarization = testedPolarization
@@ -44,10 +48,13 @@ class SourceMLMirror():
 		self.defaultMirrorPos4d = compose(self.defaultMirrorPosition, self.defaultMirrorOrientation, np.ones(3), np.zeros(3))
 
 		mirror = MultiLayerMirror(self.reflFile, self.testedPolarization,
-        pos4d = self.defaultMirrorPos4d)
+        pos4d = self.defaultMirrorPos4d) ; return mirror
 
 
 	def __init__(self, reflFile, testedPolarization, openningAngle, sourceDistance = 500, **kwargs):
+		# Generate Default Mirror
+		self.mirror = self.defaultMirror(reflFile, testedPolarization)
+		self.source = self.defaultSource(openningAngle, sourceDistance)
 		'''Default Setup:
 		Z+ is out of the screen. X+ is to the right. Y+ is upwards.
 
@@ -57,11 +64,6 @@ class SourceMLMirror():
 		   	|
 		   	MLMirror------>
 		'''
-
-		# Generate Default Mirror
-		self.mirror = defaultMirror(refFile, testedPolarization)
-
-		self.source = defaultSource(openningAngle, sourceDistance)
         
 
 
@@ -81,9 +83,6 @@ class SourceMLMirror():
 		
 		report += " \n \n"
 		report += "Source:\n"
-		report += "    -position: " + str(self.sourcePos)+ "\n"
-		report += "    -direction: " + str(self.sourceDirection)+ "\n"
-		report += "    -solid angle: " + str(self.delta) + " steradians"+ "\n"
 
 		report += "\n \n RAW: \n"
 		report += str(self.mirror.geometry)
