@@ -131,13 +131,14 @@ class SourceMLMirror(OpticalElement):
 		rowsToRemove = np.array(rowsToRemove)
 		reflectedPhotons.remove_rows(rowsToRemove)
 
+		# Transform the reflected photons from the local cooridinate system to the global coordinate system
+
+		reflectedPhotons['dir'] = np.dot(self.pos4d, reflectedPhotons['dir'].T).T
+
+		reflectedPhotons['pos'] = np.dot(self.pos4d, reflectedPhotons['pos'].T).T
+
 		return reflectedPhotons
 
-
-
-
-		#Transform the reflected photons from the local coordinate system to the global coordinate system
-		#reflectedPhotons['dir'] = np.dot(self.pos4d, reflectedPhotons['dir'].T).T
 
 
 	def offset_mirror(self, offsetMatrix):
