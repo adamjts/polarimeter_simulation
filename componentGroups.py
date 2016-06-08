@@ -64,8 +64,19 @@ class SourceMLMirror():
 		   	|
 		   	MLMirror------>
 		'''
-        
-
+	
+	def updateSource(self, position=None, openningAngle = None, direction = None):
+		if position is None:
+			position = self.source.position
+		if openningAngle is None:
+			openningAngle = self.source.deltaphi
+		if direction is None:
+			direction = self.source.dir
+		flux = 100
+		V = 10
+		I = 0.1
+		energies = createEnergyTable('C', V_kV = V, I_mA = I) 
+		self.source = LabPointSourceCone(position, delta = openningAngle, energy = energies, direction = direction, flux = flux)
 
 
 	def updateMirror(self, positionMatrix):
@@ -83,8 +94,11 @@ class SourceMLMirror():
 		
 		report += " \n \n"
 		report += "Source:\n"
+		report += "    -position: " + str(self.source.position) + "\n"
+		report += "    -direction: " + str(self.source.dir) + "\n"
+		report += "    -solid angle: " + str(self.source.deltaphi) + "\n"
 
-		report += "\n \n RAW: \n"
+		report += "\n \n RAW_mirror: \n"
 		report += str(self.mirror.geometry)
 
 		return report
@@ -109,6 +123,8 @@ class SourceMLMirror():
 		rowsToRemove = np.array(rowsToRemove)
 		reflectedPhotons.remove_rows(rowsToRemove)
 
+		#LATER DEPENDING ON THE ORIENTATION OF THE ENTIRE THING WE CAN ROTATE THEN ENTIRE APPRATUS (ROTATE ALL REFLECTED PHOTONS)
+
 		return reflectedPhotons
 
 	def offset_mirror(self, offsetMatrix):
@@ -126,6 +142,22 @@ class SourceMLMirror():
 		positionMatrix = np.dot(moveMatrix, self.mirror.pos4d)
 
 		self.updateMirror(positionMatrix)
+
+	def offset_source(self, offsetVector):
+		# This is how we offset the source from its default position
+		position = self.defaultSourcePosition + np.array(offsetVector)
+
+		self.updateSource(position = position)
+
+	def move_source(self,offsetVector):
+		# This is how we move the mirror relative to its current position
+
+		position = self.source.position + np.array(offsetVector)
+
+		self.updateSource(position = position)
+
+
+
 
 '''
 
