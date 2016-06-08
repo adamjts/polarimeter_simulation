@@ -19,20 +19,45 @@ from energyDistributions import createEnergyTable
 class SourceMLMirror():
 	#this will also alllow the elements to wiggle later. RN it goes light source --> MLMirror
 	# The mirror is at the center of this object
-	def __init__(self, reflFile, testedPolarization, openningAngle, sourceDistance = 500, **kwargs):
 
+
+	def __init__(self, reflFile, testedPolarization, openningAngle, sourceDistance = 500, **kwargs):
+		'''Default Setup:
+		Z+ is out of the screen. X+ is to the right. Y+ is upwards.
+
+		   Source
+		   	|
+		   	|
+		   	|
+		   	MLMirror------>
+		'''
         # parameters for coneSource -- THESE WILL ALL BE WOBBLED LATER
-		self.sourcePos = [0,sourceDistance, 0]
+		self.sourcePos = [0, sourceDistance , 0]
 		self.sourceDirection = [0,-1,0]
 		self.delta = openningAngle/2 
 
-		#mirrorData
+		#mirrorData Defaults - reference files
 		self.reflFile = reflFile
 		self.testedPolarization = testedPolarization
+
+		#mirror Defauls
+		self.defaultMirrorOrientation = euler2mat(-np.pi/4, 0, 0, 'syxz')
+		self.defaultMirrorOrientation = np.dot(euler2mat(0,-np.pi/2,0,'syxz'),self.defaultMirrorOrientation)
+
+		self.defaultMirrorPosition = np.array([0,0,0])
+		
+		#INITALLY DEFAULTS
+		self.currentMirrorOrientation = self.defaultMirrorOrientation
+		self.currentMirrorPosition = self.defaultMirrorPosition
+
 		# Generate Mirror
 		self.mirror = MultiLayerMirror(self.reflFile, self.testedPolarization,
-        position=np.array([0, 0, 0]), orientation=euler2mat(0, 0, np.pi/4, 'syxz'))
+        position=self.currentMirrorPosition, orientation=self.currentMirrorOrientation)
 
+	def updateMirror(self):
+		# Generate Mirror
+		self.mirror = MultiLayerMirror(self.reflFile, self.testedPolarization,
+        position=self.currentMirrorPosition, orientation=self.currentMirrorOrientation)
 
 
 	def __str__(self):
@@ -56,6 +81,7 @@ class SourceMLMirror():
 			
 
 	def generate_photons(self, exposureTime, flux=100, V=10, I=0.1):
+
 		# Generate Initial Photons
 
 		energies = createEnergyTable('C', V_kV = V, I_mA = I) 
@@ -80,19 +106,46 @@ class SourceMLMirror():
 		return reflectedPhotons
 
 	def offset_mirror_orientation(self, rotationMatrix):
-		self.mirror = MultiLayerMirror(self.reflFile, self.testedPolarization,
-			position=np.array([0, 0, 0]), orientation=np.dot(rotationMatrix,euler2mat(0, 0, np.pi/4, 'syxz')))
+		# This is used to rotate the mirror relative to its default orientation
+
+		# Update Mirror Orientation
+		rotationMatrix = np.array(rotationMatrix)
+		self.currentMirrorOrientation = np.dot(rotationMatrix, self.defaultMirrorOrientation)
+
+		# Reset Mirror Position
+		self.currentMirrorPosition = self.defaultMirrorPosition
+
+		self.updateMirror()
 
 	def offset_mirror_position(self, position):
-		position = np.array(position)
-		self.mirror = MultiLayerMirror(self.reflFile, self.testedPolarization,
-			position=position, orientation=euler2mat(0, 0, np.pi/4, 'syxz'))
+		# This is used to place the mirror relative to its default position.
 
-	def move_mirror_position(self, displacement):
-		displacement = displacement + [0]
-		self.mirror.geometry['center'] += np.array(displacement)
+		# Reset Mirror Orientation
+		self.currentMirrorOrientation = self.defaultMirrorOrientation
+
+		# Update Mirror Position
+		position = np.array(position)
+		self.currentMirrorPosition = position
+
+		self.updateMirror()
+		
 
 	def move_mirror_orientation(self,rotationMatrix):
+
+		# Update Mirror Orientation
+		self.currentMirrorOrientation = np.dot(rotationMatrix, self.currentMirrorOrientation)
+
+		self.updateMirror()
+
+	def move_mirror_position(self, displacement):
+		# This is used to move the mirror relative to its current position
+
+		self.currentMirrorPosition = self.currentMirrorPosition + np.array(displacement)
+
+		self.updateMirror()
+
+
+
 
 
 
