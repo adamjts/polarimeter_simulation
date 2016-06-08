@@ -176,6 +176,113 @@ class SourceMLMirror(OpticalElement):
 
 
 
+class MLMirrorDetector(OpticalElement):
+
+	def defaultMirror(self,reflFile, testedPolarization):
+		#mirrorData Defaults - reference files
+		self.reflFile = reflFile
+		self.testedPolarization = testedPolarization
+
+		#mirror Defauls
+		self.defaultMirrorOrientation = euler2mat(-np.pi/4, 0, 0, 'syxz')
+		self.defaultMirrorOrientation = np.dot(euler2mat(0,-np.pi/2,0,'syxz'),self.defaultMirrorOrientation)
+		self.defaultMirrorOrientation = np.dot(euler2mat(np.pi,0,0,'syxz'),self.defaultMirrorOrientation)
+
+		self.defaultMirrorPosition = np.array([0,0,0])
+
+		self.defaultMirrorPos4d = compose(self.defaultMirrorPosition, self.defaultMirrorOrientation, np.array([1, 24.5, 12]), np.zeros(3))
+
+		mirror = MultiLayerMirror(self.reflFile, self.testedPolarization,
+        pos4d = self.defaultMirrorPos4d); return mirror
+
+
+	def defaultDetector(self, detectorDistance):
+		self.defaultDetectorOrientation = euler2mat(0, 0 , -np.pi/2, 'syxz')
+		self.defaultDetectorPosition = np.array([0, detectorDistance, 0])
+		self.defaultDetectorPos4d = compose(self.defaultDetectorPosition, self.defaultDetectorOrientation, [1, 12.288, 12.288], np.zeros(3))
+		detector = FlatDetector(pixsize=24.576e-3, pos4d = self.defaultDetectorPos4d)
+
+		return detector
+
+
+
+
+	def __init__(self, reflFile, testedPolarization, detectorDistance = 50, **kwargs):
+		super(MLMirrorDetector, self).__init__(**kwargs)
+		self.defaultApparatusPos4d = self.pos4d
+
+		# Generate Default Mirror
+		self.mirror = self.defaultMirror(reflFile, testedPolarization)
+		# Generate Default Detector
+		self.detector = self.defaultDetector(detectorDistance)
+		'''Default Setup:
+		Z+ is out of the screen. X+ is to the right. Y+ is upwards.
+
+		  			 detector
+		   			   /|\
+		  			 	|
+					   	|
+		 	>-->-->--MLMirror
+
+		   	self.pos4d is a record of all the transformations on the ENTIRE setup as a whole
+		'''
+
+	def __str__(self):
+		report = "APPARATUS GEOMETRY ****************** (Global Coordinates) \n"
+		report += "    -transformation record: \n" + str(self.pos4d)
+
+
+		report += "\n \n"
+		report += "CURRENT SETUP ****************** (Local Coordinates)\n"
+
+		report += "Mirror:\n" 
+		report += "    -center: " + str(self.mirror.geometry['center']) + "\n"
+		report += "    -norm: "+ str(self.mirror.geometry['plane']) + "\n"
+		
+
+		report += " \n \n"
+		report += "Detector: \n"
+		report += "    -center: " + str(self.detector.geometry['center']) + "\n"
+		report += "    -norm: "+ str(self.detector.geometry['plane']) + "\n"
+
+		report += "\n \n"
+		report += "RAW_mirror: \n"
+		report += str(self.mirror.geometry)
+
+		report += "\n \n"
+		report += "RAW_detector: \n"
+		report += str(self.detector.geometry)
+
+		return report
+
+	def updateDetector(self, detectorPos4d):
+		self.detector = FlatDetector(pixsize=24.576e-3, pos4d = detectorPos4d)
+
+
+
+
+	def detect_photons(self, photons):
+		reflectedPhotons = self.mirror.process_photons(photons)
+
+
+		#remove the zero probabilities
+		rowsToRemove = []
+
+		for i in range(0,len(reflectedPhotons)):
+			if (reflectedPhotons[i]['probability']==0):
+				rowsToRemove.append(i)
+
+		rowsToRemove = np.array(rowsToRemove)
+		reflectedPhotons.remove_rows(rowsToRemove)
+
+		detectedPhotons = self.detector.process_photons(reflectedPhotons)
+
+		return detectedPhotons
+
+#	def move_detector(self, moveMatrix):
+
+
+
 
 
 
