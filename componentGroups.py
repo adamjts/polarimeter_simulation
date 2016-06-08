@@ -36,16 +36,17 @@ class SourceMLMirror():
 		self.sourceDirection = [0,-1,0]
 		self.delta = openningAngle/2 
 
-		#mirrorData Defaults
+		#mirrorData Defaults - reference files
 		self.reflFile = reflFile
 		self.testedPolarization = testedPolarization
 
+		#mirror Defauls
 		self.defaultMirrorOrientation = euler2mat(-np.pi/4, 0, 0, 'syxz')
 		self.defaultMirrorOrientation = np.dot(euler2mat(0,-np.pi/2,0,'syxz'),self.defaultMirrorOrientation)
 
 		self.defaultMirrorPosition = np.array([0,0,0])
 		
-		#INITAL DEFAULTS
+		#INITALLY DEFAULTS
 		self.currentMirrorOrientation = self.defaultMirrorOrientation
 		self.currentMirrorPosition = self.defaultMirrorPosition
 
@@ -117,7 +118,7 @@ class SourceMLMirror():
 		self.updateMirror()
 
 	def offset_mirror_position(self, position):
-		# This is used to place the mirror relative to its default position
+		# This is used to place the mirror relative to its default position.
 
 		# Reset Mirror Orientation
 		self.currentMirrorOrientation = self.defaultMirrorOrientation
