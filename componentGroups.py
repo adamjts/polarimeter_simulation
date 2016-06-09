@@ -364,11 +364,17 @@ class rotatingSimulation():
 	def __str__(self):
 		return "Resolution: " + str(self.numberOfAngles) + " angles\nExposure Time: " +str(self.exposureTime)
 
-	def run(self, angles = 3, exposureTime = 10000):
+	def run(self, numAngles = 3, exposureTime = 1000):
+		# Will also return angle and total probability as 2D array
 
-		self.numberOfAngles = angles
+		self.numberOfAngles = numAngles
 		self.exposureTime = exposureTime
 
+		# These two lines are purely for the returned statistic
+		probabilities = np.array([])
+		angles = np.array([])
+
+		# Create an instance of the simulation
 		sim = staticSimulation()
 
 		for i in range(0, self.numberOfAngles):
@@ -379,7 +385,78 @@ class rotatingSimulation():
 
 			results = sim.run(self.exposureTime)
 
-			results.write('./RotatingSimulationTrials/Trial' + str(self.trialNumber) + '/Angle' + str(i+1)+ 'of' + str(angles) + '.fits')
+			results.write('./RotatingSimulationTrials/Trial' + str(self.trialNumber) + '/Angle' + str(i+1)+ 'of' + str(self.numberOfAngles) + '.fits')
+
+			# For returning angle-probability relationship
+			angles = np.append(angles, [angle])
+
+			probability = np.sum(results['probability'])
+			probabilities =np.append(probabilities, [probability])
+
+		return [angles, probabilities]
+
+
+
+
+
+
+
+
+
+'''
+
+class dataSheet():
+	def __init__(self, pathway, name):
+
+		self.pathway = pathway
+
+		self.NFiles = len([f for f in os.listdir(pathway)
+                if os.path.isfile(os.path.join(name, f))])
+
+		self.filename = pathway + name + '.fits'
+
+		if not os.path.exists(self.filename):
+
+			self.dataTable = Table
+
+			self.dataTable['Angle'] = []
+
+			for i in range(0,len(self.NFiles)):
+				inc = 2*np.pi / self.NFiles
+				angle = i * inc
+
+				self.dataTable['Angle'][i] = angle
+
+
+			self.dataTable.write(self.filename)
+		else:
+			self.dataTable = Table.read(self.filename)
+
+
+
+	def add_total_probabilities(self, *args):
+
+		filenames = args
+
+		self.dataTable = Table.read(self.filename)
+
+		self.dataTable['Total Probability'] = []
+
+		probabilities = []
+
+		for i in range(0, len(args)):
+			photonTable = Table.read( self.pathway + "/" +filenames[i])
+			probability = np.sum(photonTable['probability'])
+
+			self.dataTable['Total Probability'] = np.append(self.dataTable['Total Probability'], [probability])
+
+		self.dataTable.write(self.filename)
+
+
+
+
+
+'''
 
 
 
