@@ -346,10 +346,10 @@ class staticSimulation():
 
 		return self.results
 
-class rotatingSimulation():
+class rotation():
 	def __init__(self):
-		self.numberOfAngles = 1 #NUMBER OF ANLGES THAT WILL BE TESTED
-		self.exposureTime = 10000
+		#self.numberOfAngles = 3 #NUMBER OF ANLGES THAT WILL BE TESTED
+		#self.exposureTime = 1000
 
 		if not os.path.exists('./RotatingSimulationTrials'):
 			os.mkdir('./RotatingSimulationTrials')
@@ -362,9 +362,9 @@ class rotatingSimulation():
 		os.mkdir('./RotatingSimulationTrials/Trial' + str(self.trialNumber))
 
 	def __str__(self):
-		return "Resolution: " + str(self.numberOfAngles) + " angles\nExposure Time: " +str(self.exposureTime)
+		return "rotation.run( [static_simulation], [number_of_angles = 3], [exposure_time = 1000])"
 
-	def run(self, numAngles = 3, exposureTime = 1000):
+	def run(self, staticSimulation, numAngles = 3, exposureTime = 1000):
 		# Will also return angle and total probability as 2D array
 
 		self.numberOfAngles = numAngles
@@ -375,11 +375,11 @@ class rotatingSimulation():
 		angles = np.array([])
 
 		# Create an instance of the simulation
-		sim = staticSimulation()
+		sim = staticSimulation #There should be one passed in so all its configurations already get handled
 
 		for i in range(0, self.numberOfAngles):
 			angle = i * (2*np.pi/self.numberOfAngles)
-			print "Running Angle: " + str(angle) + "... \n"
+			print "\nRunning Angle: " + str(angle) + "..."
 
 			sim.offset_angle(angle)
 
