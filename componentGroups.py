@@ -285,6 +285,62 @@ class MLMirrorDetector(OpticalElement):
 
 
 
+#********************    SIMULATIONS    ***********************************************************************************************************
+
+
+class staticSimulation():
+
+	def __init__(self, firstMirrorREFL = './mirror_files/A12113.txt', firstMirrorPOL = './mirror_files/ALSPolarization.txt', secondMirrorREFL= './mirror_files/A12113.txt', secondMirrorPOL = './mirror_files/ALSPolarization.txt'):
+
+		self.first = SourceMLMirror(firstMirrorREFL, firstMirrorPOL)
+		self.second = MLMirrorDetector(secondMirrorREFL, secondMirrorPOL)
+
+
+		self.distanceBetweenHalves = 50
+		self.angleOffset = 0
+
+		Rotation = euler2mat(0,0,0,'syxz')
+		FirstHalfPlacement = compose([-self.distanceBetweenHalves,0,0], Rotation, [1,1,1], [0,0,0]) #This will move the first half away from the second by 50 mm
+
+		self.first.offset_apparatus(FirstHalfPlacement)
+
+	def __str__(self):
+		report = 'Static Setup: \n'
+		report += '    -Distance Between Halves: ' + str(self.distanceBetweenHalves) + "\n"
+		report += '    -Angle Offset: ' + str(self.angleOffset) + "\n \n"
+		report += 'Individual Component Details under self.first and self.second. (ex: print (SimulationName).first). Each subcomponent accessible through self.first.source / self.second.mirror' 
+
+		return report
+
+	def configure_mirrors(self,firstMirrorREFL = './mirror_files/A12113.txt', firstMirrorPOL = './mirror_files/ALSPolarization.txt', secondMirrorREFL= './mirror_files/A12113.txt', secondMirrorPOL = './mirror_files/ALSPolarization.txt'):
+		self.first = SourceMLMirror(firstMirrorREFL, firstMirrorPOL)
+		self.second = MLMirrorDetector(secondMirrorREFL, secondMirrorPOL)
+
+	def run(self, exposureTime = 1000):
+		# Generating photons that travel down the beamline
+		print "Generating Cross Photons..."
+		cross = self.first.generate_photons(exposureTime)
+
+		# Receive Photons on other side
+		print "Receiving Photons..."
+		self.results = self.second.detect_photons(cross)
+
+		return self.results
+
+
+
+
+
+#*********************    PLOTTING     ****************************
+'''
+class plotImage():
+	def __init__(self):
+'''
+
+
+
+
+
 
 
 
