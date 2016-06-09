@@ -5,6 +5,8 @@ from astropy.table import Table, Column, vstack
 from transforms3d.euler import euler2mat
 from transforms3d.affines import compose
 
+import os
+
 from marxs.source.labSource import FarLabPointSource, LabPointSource, LabPointSourceCone
 from marxs.optics.baffle import Baffle
 from marxs.optics.multiLayerMirror import MultiLayerMirror
@@ -125,7 +127,13 @@ class SourceMLMirror(OpticalElement):
 		rowsToRemove = []
 
 		for i in range(0,len(reflectedPhotons)):
+
+			# Remove Photons that Miss
 			if (reflectedPhotons[i]['probability']==0):
+				rowsToRemove.append(i)
+
+			# Remove negligible Photons
+			if (reflectedPhotons[i]['probability']<=(5e-10)):
 				rowsToRemove.append(i)
 
 		rowsToRemove = np.array(rowsToRemove)
@@ -316,6 +324,17 @@ class staticSimulation():
 		self.first = SourceMLMirror(firstMirrorREFL, firstMirrorPOL)
 		self.second = MLMirrorDetector(secondMirrorREFL, secondMirrorPOL)
 
+	def offset_angle(self, angle):
+		self.angleOffset = angle
+
+		Rotation = euler2mat(0,angle,0,"syxz")
+
+		matrix = compose([0,0,0],Rotation,[1,1,1],[0,0,0])
+
+		self.first.offset_apparatus(matrix)
+
+
+
 	def run(self, exposureTime = 1000):
 		# Generating photons that travel down the beamline
 		print "Generating Cross Photons..."
@@ -327,15 +346,157 @@ class staticSimulation():
 
 		return self.results
 
+class rotatingSimulation():
+	def __init__(self):
+		self.numberOfAngles = 1 #NUMBER OF ANLGES THAT WILL BE TESTED
+		self.exposureTime = 10000
+
+		if not os.path.exists('./RotatingSimulationTrials'):
+			os.mkdir('./RotatingSimulationTrials')
+
+		self.trialNumber = 0
+
+		while os.path.isdir('./RotatingSimulationTrials/Trial' + str(self.trialNumber)):
+			self.trialNumber = self.trialNumber + 1
+
+		os.mkdir('./RotatingSimulationTrials/Trial' + str(self.trialNumber))
+
+	def __str__(self):
+		return "Resolution: " + str(self.numberOfAngles) + " angles\nExposure Time: " +str(self.exposureTime)
+
+	def run(self, angles = 3, exposureTime = 10000):
+
+		self.numberOfAngles = angles
+		self.exposureTime = exposureTime
+
+		sim = staticSimulation()
+
+		for i in range(0, self.numberOfAngles):
+			angle = i * (2*np.pi/self.numberOfAngles)
+			print "Running Angle: " + str(angle) + "... \n"
+
+			sim.offset_angle(angle)
+
+			results = sim.run(self.exposureTime)
+
+			results.write('./RotatingSimulationTrials/Trial' + str(self.trialNumber) + '/Angle' + str(i+1)+ 'of' + str(angles) + '.fits')
+
+
+
+
 
 
 
 
 #*********************    PLOTTING     ****************************
+
+class DataDetails():
+	#This is for a single angle
+	def __init__(self, data):
+		self.data = data.copy()
+
+	def filterProbabilities(self):
+		# Removes from self.data photons w/ probability < median probability
+		medianProbability = np.median(self.data['probability'])
+
+		rowsToRemove = []
+		for i in range(0,len(self.data)):
+			if (self.data[i]['probability'] <= medianProbability):
+				rowsToRemove.append(i)
+
+		rowsToRemove = np.array(rowsToRemove)
+		self.data.remove_rows(rowsToRemove)
+
+	def outliers(self, quality = 'probability', highLow = 'high'):
+		# Returns Table of outliers
+		outliers = self.data.copy()
+
+		Q3 = np.percentile(self.outliers[quality], 75 )
+		Q1 = np.percentile(self.outliers[quality], 25)
+		IQR = Q3 - Q1
+
+		rowsToRemove = []
+
+		if (highLow == 'high'):
+			boundary = Q3 + (1.5 * IQR)
+			for i in range(0,len(outliers)):
+				if (self.outliers[i][quality] <= boundary):
+					rowsToRemove.append(i)
+		elif (highLow == 'low'):
+			boundary = Q1 - (1.5*IQR)
+			for i in range(0,len(outliers)):
+				if (self.outliers[i][quality] >= boundary):
+					rowsToRemove.append(i)
+		else:
+			print 'ERROR'
+
+		rowsToRemove = np.array(rowsToRemove)
+
+		outliers.remove_rows(rowsToRemove)
+
+		return outliers
 '''
-class plotImage():
+	def groupPhotonsAngle(self, quality = 'polangle', increment = 0.1):
+		# This returns the sum of the probabilities of phots within the same increment
+		number_of_increments = (2*np.pi) / increment
+
+		groupData = self.data.copy()
+
+		probabilities=np.array([])
+
+		angleIncrements = np.arange((increment/2), 2*np.pi, increment)
+
+		for inc in range(0, int(number_of_increments + 1)):
+			lowerPercentile = (100/number_of_increments) * inc
+			upperPercentile = (100/number_of_increments) * (inc+1)
+
+			lowerBound = np.percentile((2*np.pi), lowerPercentile)
+			upperBound = np.percentile((2*np.pi), upperPercentile)
+
+			probabilityPerIncrement = 0
+
+			for i in range(0, len(groupData)):
+				angle = groupData['polangle'][i]
+				if ((angle >= lowerBound) and (angle < upperBound)):
+					probabilityPerIncrement += groupData['probability'][i]
+
+
+			probabilities = np.append(probabilities, [probabilityPerIncrement])
+
+
+		return np.array([angleIncrements, probabilities])'''
+
+
+
+
+
+
+
+
+
+
+
+
+'''
+
+class plotter():
 	def __init__(self):
+		plt.clf()
+
+	def probability_polarization(self, dataTable):
+
+
+		
+	def outliers(self, quality = 'probability'):
+		# Returns table of photons whose 'quality' is an outlier. Quality could be probability, polarization, etc.
+
+	def hist(self, resolution):
+		# Histogram with resultion corresponding to bin size.
+
+
+
 '''
+
 
 
 
