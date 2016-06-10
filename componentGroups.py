@@ -145,6 +145,8 @@ class SourceMLMirror(OpticalElement):
 
 		reflectedPhotons['pos'] = np.dot(self.pos4d, reflectedPhotons['pos'].T).T
 
+		reflectedPhotons['polarization'] = np.dot(self.pos4d, reflectedPhotons['polarization'].T).T
+
 		return reflectedPhotons
 
 
@@ -351,21 +353,47 @@ class rotation():
 		#self.numberOfAngles = 3 #NUMBER OF ANLGES THAT WILL BE TESTED
 		#self.exposureTime = 1000
 
+		# Make a folder to hold the trials
+
 		if not os.path.exists('./RotatingSimulationTrials'):
 			os.mkdir('./RotatingSimulationTrials')
+
+		
+		# Determine current trial number
 
 		self.trialNumber = 0
 
 		while os.path.isdir('./RotatingSimulationTrials/Trial' + str(self.trialNumber)):
 			self.trialNumber = self.trialNumber + 1
 
-		os.mkdir('./RotatingSimulationTrials/Trial' + str(self.trialNumber))
+		
 
 	def __str__(self):
 		return "rotation.run( [static_simulation], [number_of_angles = 3], [exposure_time = 1000])"
 
+
+	def theTrialNumber(self):
+
+		self.trialNumber = 0
+		while os.path.isdir('./RotatingSimulationTrials/Trial' + str(self.trialNumber)):
+			self.trialNumber = self.trialNumber + 1
+
+		return self.trialNumber
+
+	def makeTrialFolder(self, trialNumber = None):
+
+		if trialNumber == None:
+			trialNumber = self.trialNumber
+
+		os.mkdir('./RotatingSimulationTrials/Trial' + str(trialNumber))
+
+
 	def run(self, staticSimulation, numAngles = 3, exposureTime = 1000):
 		# Will also return angle and total probability as 2D array
+
+		# Make a Folder to Hold This Trial
+		self.makeTrialFolder(self.theTrialNumber())
+
 
 		self.numberOfAngles = numAngles
 		self.exposureTime = exposureTime
