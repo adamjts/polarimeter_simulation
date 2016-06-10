@@ -395,9 +395,6 @@ class rotation():
 		self.makeTrialFolder(self.theTrialNumber())
 
 
-		self.numberOfAngles = numAngles
-		self.exposureTime = exposureTime
-
 		# These two lines are purely for the returned statistic
 		probabilities = np.array([])
 		angles = np.array([])
@@ -405,15 +402,15 @@ class rotation():
 		# Create an instance of the simulation
 		sim = staticSimulation #There should be one passed in so all its configurations already get handled
 
-		for i in range(0, self.numberOfAngles):
-			angle = i * (2*np.pi/self.numberOfAngles)
+		for i in range(0, numAngles):
+			angle = i * (2*np.pi/numAngles)
 			print "\nRunning Angle: " + str(angle) + "..."
 
 			sim.offset_angle(angle)
 
-			results = sim.run(self.exposureTime)
+			results = sim.run(exposureTime)
 
-			results.write('./RotatingSimulationTrials/Trial' + str(self.trialNumber) + '/Angle' + str(i+1)+ 'of' + str(self.numberOfAngles) + '.fits')
+			results.write('./RotatingSimulationTrials/Trial' + str(self.trialNumber) + '/Angle' + str(i+1)+ 'of' + str(numAngles) + '.fits')
 
 			# For returning angle-probability relationship
 			angles = np.append(angles, [angle])
