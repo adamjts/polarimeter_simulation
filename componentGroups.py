@@ -409,6 +409,7 @@ class rotation():
 		# These two lines are purely for the returned statistic
 		probabilities = np.array([])
 		angles = np.array([])
+		
 
 		# Create an instance of the simulation
 		sim = staticSimulation #There should be one passed in so all its configurations already get handled
