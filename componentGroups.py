@@ -6,6 +6,7 @@ from transforms3d.euler import euler2mat
 from transforms3d.affines import compose, decompose
 
 import os
+import datetime
 
 from marxs.source.labSource import FarLabPointSource, LabPointSource, LabPointSourceCone
 from marxs.optics.baffle import Baffle
@@ -399,6 +400,8 @@ class rotation():
 	def run(self, staticSimulation, numAngles = 3, exposureTime = 1000):
 		# Will also return angle and total probability as 2D array
 
+		startTime = datetime.datetime.now()
+
 		# Make a Folder to Hold This Trial
 		self.makeTrialFolder(self.theTrialNumber())
 
@@ -427,25 +430,33 @@ class rotation():
 			probabilities =np.append(probabilities, [probability])
 
 
+		# Record Runtime
+		endTime = datetime.datetime.now()
+
+		runTime = endTime - startTime
+
 
 		# Set static simulation back to angle zero:
 		sim.offset_angle(0)
 
+
+
 		# Record Trial Data:
-		self.writeTrialDetails('./RotatingSimulationTrials/Trial' + str(self.trialNumber) , sim, numAngles, exposureTime )
+		self.writeTrialDetails('./RotatingSimulationTrials/Trial' + str(self.trialNumber) , sim, numAngles, exposureTime, runTime )
 
 		return [angles, probabilities]
 
-	def writeTrialDetails(self, pathway, simulation, numAngles, exposureTime):
+	def writeTrialDetails(self, pathway, simulation, numAngles, exposureTime, runtime):
 
 		trialDetailsFile = open( pathway + "/trialDetails.txt", "w")
 
-		trialDetailsFile.write("Trial Number: " + str(self.trialNumber) + "\n")
-		trialDetailsFile.write("Type: rotation of first half of simulation\n\n")
+		trialDetailsFile.write("Trial Number: " + str(self.trialNumber) + "    " + str(datetime.datetime.now()) + "\n")
+		trialDetailsFile.write("Type: rotation of first half of simulation\n")
+		trialDetailsFile.write("Runtime: " + str(runtime) + '\n\n\n')
 		trialDetailsFile.write("Details:\n")
 		trialDetailsFile.write("-----------------------\n")
 		trialDetailsFile.write("Resolution:\n")
-		trialDetailsFile.write(" -Number of Angles: " + str(numAngles) + '\n')
+		trialDetailsFile.write(" -Number of Angles: " + str(numAngles) + "    (" + str(2*np.pi/numAngles) + " radian increments starting at 0.0)"+ '\n')
 		trialDetailsFile.write(" -Exposure Time Per Angle: " + str(exposureTime) + '\n\n\n')
 		trialDetailsFile.write("Structure: \n")
 		trialDetailsFile.write(" -First:\n")
@@ -453,8 +464,8 @@ class rotation():
 		trialDetailsFile.write(" --Source Local Position:" + str(simulation.first.source.position) + '\n')
 		trialDetailsFile.write(" --Source Local Direction: " +str(simulation.first.source.dir) + '\n')
 		trialDetailsFile.write(" --Source Openning Angle: " +str(simulation.first.source.deltaphi) + ' steradians\n')
-		trialDetailsFile.write(" --Mirror Local Position" + str(simulation.first.mirror.geometry['center']) + '\n')
-		trialDetailsFile.write(" --Mirror Local Plane" + str(simulation.first.mirror.geometry['plane']) + '\n')
+		trialDetailsFile.write(" --Mirror Local Position: " + str(simulation.first.mirror.geometry['center']) + '\n')
+		trialDetailsFile.write(" --Mirror Local Plane: " + str(simulation.first.mirror.geometry['plane']) + '\n')
 		trialDetailsFile.write(" --Mirror File: " + str(simulation.first.reflFile)+'\n\n')
 		trialDetailsFile.write(" -Second:\n")
 		trialDetailsFile.write(" --Position (Global)\n" + str(simulation.second.pos4d) + '\n')
@@ -465,7 +476,7 @@ class rotation():
 		trialDetailsFile.write(" --Mirror File: " + str(simulation.second.reflFile) + '\n\n\n')
 		trialDetailsFile.write("Source:\n")
 		trialDetailsFile.write(" -Flux: " + str(simulation.first.source.flux) + '\n')
-		trialsDetailFile.write(" -Energy: " + str(simulation.first.source.energy) + '\n')
+		trialDetailsFile.write(" -Energy: " + str(simulation.first.source.energy) + '\n')
 
 		trialDetailsFile.close()
 
