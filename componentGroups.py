@@ -126,18 +126,21 @@ class SourceMLMirror(OpticalElement):
 		reflectedPhotons = self.mirror.process_photons(photons)# Removing photons with zero probability 
 		rowsToRemove = []
 
-		for i in range(0,len(reflectedPhotons)):
 
+
+		for i in range(0,len(reflectedPhotons)):
 			# Remove Photons that Miss
 			if (reflectedPhotons[i]['probability']==0):
-				rowsToRemove.append(i)
+					rowsToRemove.append(i)
 
 			# Remove negligible Photons
 			if (reflectedPhotons[i]['probability']<=(5e-10)):
 				rowsToRemove.append(i)
 
 		rowsToRemove = np.array(rowsToRemove)
-		reflectedPhotons.remove_rows(rowsToRemove)
+
+		if (len(rowsToRemove)>0):
+			reflectedPhotons.remove_rows(rowsToRemove)
 
 		# Transform the reflected photons from the local cooridinate system to the global coordinate system
 
@@ -283,7 +286,9 @@ class MLMirrorDetector(OpticalElement):
 				rowsToRemove.append(i)
 
 		rowsToRemove = np.array(rowsToRemove)
-		reflectedPhotons.remove_rows(rowsToRemove)
+
+		if (len(rowsToRemove) > 0):
+			reflectedPhotons.remove_rows(rowsToRemove)
 
 		detectedPhotons = self.detector.process_photons(reflectedPhotons)
 
@@ -417,6 +422,11 @@ class rotation():
 
 			probability = np.sum(results['probability'])
 			probabilities =np.append(probabilities, [probability])
+
+
+
+		# Set static simulation back to angle zero:
+		sim.offset_angle(0)
 
 		return [angles, probabilities]
 
