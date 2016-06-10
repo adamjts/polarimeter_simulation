@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 #from mpl_toolkits.mplot3d import axes3d
 from astropy.table import Table, Column, vstack
 from transforms3d.euler import euler2mat
-from transforms3d.affines import compose
+from transforms3d.affines import compose, decompose
 
 import os
 
@@ -189,6 +189,7 @@ class SourceMLMirror(OpticalElement):
 
 
 
+
 class MLMirrorDetector(OpticalElement):
 
 	def defaultMirror(self,reflFile, testedPolarization):
@@ -336,7 +337,9 @@ class staticSimulation():
 
 		Rotation = euler2mat(0,angle,0,"syxz")
 
-		matrix = compose([0,0,0],Rotation,[1,1,1],[0,0,0])
+		currentPosition, currentRotation, currentZoom, currentShear = decompose(self.first.pos4d)
+
+		matrix = compose( currentPosition ,Rotation,[1,1,1],[0,0,0])
 
 		self.first.offset_apparatus(matrix)
 
@@ -428,7 +431,44 @@ class rotation():
 		# Set static simulation back to angle zero:
 		sim.offset_angle(0)
 
+		# Record Trial Data:
+		self.writeTrialDetails('./RotatingSimulationTrials/Trial' + str(self.trialNumber) , sim, numAngles, exposureTime )
+
 		return [angles, probabilities]
+
+	def writeTrialDetails(self, pathway, simulation, numAngles, exposureTime):
+
+		trialDetailsFile = open( pathway + "/trialDetails.txt", "w")
+
+		trialDetailsFile.write("Trial Number: " + str(self.trialNumber) + "\n")
+		trialDetailsFile.write("Type: rotation of first half of simulation\n\n")
+		trialDetailsFile.write("Details:\n")
+		trialDetailsFile.write("-----------------------\n")
+		trialDetailsFile.write("Resolution:\n")
+		trialDetailsFile.write(" -Number of Angles: " + str(numAngles) + '\n')
+		trialDetailsFile.write(" -Exposure Time Per Angle: " + str(exposureTime) + '\n\n\n')
+		trialDetailsFile.write("Structure: \n")
+		trialDetailsFile.write(" -First:\n")
+		trialDetailsFile.write(" --Starting Position (Global):\n" + str(simulation.first.pos4d) +'\n' )
+		trialDetailsFile.write(" --Source Local Position:" + str(simulation.first.source.position) + '\n')
+		trialDetailsFile.write(" --Source Local Direction: " +str(simulation.first.source.dir) + '\n')
+		trialDetailsFile.write(" --Source Openning Angle: " +str(simulation.first.source.deltaphi) + ' steradians\n')
+		trialDetailsFile.write(" --Mirror Local Position" + str(simulation.first.mirror.geometry['center']) + '\n')
+		trialDetailsFile.write(" --Mirror Local Plane" + str(simulation.first.mirror.geometry['plane']) + '\n')
+		trialDetailsFile.write(" --Mirror File: " + str(simulation.first.reflFile)+'\n\n')
+		trialDetailsFile.write(" -Second:\n")
+		trialDetailsFile.write(" --Position (Global)\n" + str(simulation.second.pos4d) + '\n')
+		trialDetailsFile.write(" --Detector Local Position: " + str(simulation.second.detector.geometry['plane']) + '\n')
+		trialDetailsFile.write(" --Detector Local Plane: " + str(simulation.second.detector.geometry['plane']) + '\n')
+		trialDetailsFile.write(" --Mirror Local Position: " + str(simulation.second.mirror.geometry['center']) + '\n')
+		trialDetailsFile.write(" --Mirror Local Plane: " + str(simulation.second.mirror.geometry['plane']) + '\n')
+		trialDetailsFile.write(" --Mirror File: " + str(simulation.second.reflFile) + '\n\n\n')
+		trialDetailsFile.write("Source:\n")
+		trialDetailsFile.write(" -Flux: " + str(simulation.first.source.flux) + '\n')
+		trialsDetailFile.write(" -Energy: " + str(simulation.first.source.energy) + '\n')
+
+		trialDetailsFile.close()
+
 
 
 
