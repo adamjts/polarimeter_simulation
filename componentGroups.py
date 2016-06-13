@@ -33,7 +33,7 @@ class SourceMLMirror(OpticalElement):
 		flux=100
 		V=10
 		I=0.1
-		energies = createEnergyTable('C', V_kV = V, I_mA = I) 
+		energies = createEnergyTable('C', V_kV = V, I_mA = I)
 		source = LabPointSourceCone(self.defaultSourcePosition, delta = openningAngle , energy= energies, direction = self.defaultSourceDirection, flux = flux) # Generate photons from original source
 		return source
 
@@ -74,7 +74,7 @@ class SourceMLMirror(OpticalElement):
 		   	The source comes in by default from the local y direction.
 		   	The photons exit by default in the local x direction
 		'''
-	
+
 	def updateSource(self, position=None, openningAngle = None, direction = None):
 		if position is None:
 			position = self.source.position
@@ -85,7 +85,7 @@ class SourceMLMirror(OpticalElement):
 		flux = 100
 		V = 10
 		I = 0.1
-		energies = createEnergyTable('C', V_kV = V, I_mA = I) 
+		energies = createEnergyTable('C', V_kV = V, I_mA = I)
 		self.source = LabPointSourceCone(position, delta = openningAngle, energy = energies, direction = direction, flux = flux)
 
 
@@ -103,11 +103,11 @@ class SourceMLMirror(OpticalElement):
 		report += "\n \n"
 		report += "CURRENT SETUP ****************** (Local Coordinates)\n"
 
-		report += "Mirror:\n" 
+		report += "Mirror:\n"
 
 		report += "    -center: " + str(self.mirror.geometry['center']) + "\n"
 		report += "    -norm: "+ str(self.mirror.geometry['plane']) + "\n"
-		
+
 		report += " \n \n"
 		report += "Source:\n"
 		report += "    -position: " + str(self.source.position) + "\n"
@@ -118,28 +118,24 @@ class SourceMLMirror(OpticalElement):
 		report += str(self.mirror.geometry)
 
 		return report
-			
 
-	def generate_photons(self, exposureTime):
-		# Generate Initial Photons
+
+	def generate_photons(self, exposureTime, probability_limit=5e-10):
+                '''Generate Initial Photons
+
+                Parameters
+                ----------
+                exposureTime : float
+                probability_limit : float
+                    Photons with a probability below this value will be discarded.
+                    Set to a negative number ot keep all.
+                '''
 		photons = self.source.generate_photons(exposureTime)
-		reflectedPhotons = self.mirror.process_photons(photons)# Removing photons with zero probability 
-		rowsToRemove = []
+		reflectedPhotons = self.mirror.process_photons(photons)# Removing photons with zero probability
 
-		for i in range(0,len(reflectedPhotons)):
+                reflectedPhotons = reflectedPhotons[reflectedPhotons['probability'] > probability_limit]
 
-			# Remove Photons that Miss
-			if (reflectedPhotons[i]['probability']==0):
-				rowsToRemove.append(i)
-
-			# Remove negligible Photons
-			if (reflectedPhotons[i]['probability']<=(5e-10)):
-				rowsToRemove.append(i)
-
-		rowsToRemove = np.array(rowsToRemove)
-		reflectedPhotons.remove_rows(rowsToRemove)
-
-		# Transform the reflected photons from the local cooridinate system to the global coordinate system
+		# Transform the reflected photons from the local coordinate system to the global coordinate system
 
 		reflectedPhotons['dir'] = np.dot(self.pos4d, reflectedPhotons['dir'].T).T
 
@@ -215,7 +211,7 @@ class MLMirrorDetector(OpticalElement):
 
 
 
-	def __init__(self, reflFile, testedPolarization, detectorDistance = 50, **kwargs):
+	def __init__(self, reflFile, testedPolarization, detectorDistance=50, **kwargs):
 		super(MLMirrorDetector, self).__init__(**kwargs)
 		self.defaultApparatusPos4d = self.pos4d
 
@@ -243,10 +239,10 @@ class MLMirrorDetector(OpticalElement):
 		report += "\n \n"
 		report += "CURRENT SETUP ****************** (Local Coordinates)\n"
 
-		report += "Mirror:\n" 
+		report += "Mirror:\n"
 		report += "    -center: " + str(self.mirror.geometry['center']) + "\n"
 		report += "    -norm: "+ str(self.mirror.geometry['plane']) + "\n"
-		
+
 
 		report += " \n \n"
 		report += "Detector: \n"
@@ -271,18 +267,7 @@ class MLMirrorDetector(OpticalElement):
 
 	def detect_photons(self, photons):
 		reflectedPhotons = self.mirror.process_photons(photons)
-
-
-		#remove the zero probabilities
-		rowsToRemove = []
-
-		for i in range(0,len(reflectedPhotons)):
-			if (reflectedPhotons[i]['probability']==0):
-				rowsToRemove.append(i)
-
-		rowsToRemove = np.array(rowsToRemove)
-		reflectedPhotons.remove_rows(rowsToRemove)
-
+		reflectedPhotons = reflectedPhotons[reflectedPhotons['probability'] > 0]
 		detectedPhotons = self.detector.process_photons(reflectedPhotons)
 
 		return detectedPhotons
@@ -316,7 +301,7 @@ class staticSimulation():
 		report = 'Static Setup: \n'
 		report += '    -Distance Between Halves: ' + str(self.distanceBetweenHalves) + "\n"
 		report += '    -Angle Offset: ' + str(self.angleOffset) + "\n \n"
-		report += 'Individual Component Details under self.first and self.second. (ex: print (SimulationName).first). Each subcomponent accessible through self.first.source / self.second.mirror' 
+		report += 'Individual Component Details under self.first and self.second. (ex: print (SimulationName).first). Each subcomponent accessible through self.first.source / self.second.mirror'
 
 		return report
 
@@ -398,43 +383,27 @@ class DataDetails():
 	def filterProbabilities(self):
 		# Removes from self.data photons w/ probability < median probability
 		medianProbability = np.median(self.data['probability'])
+                self.data = data[data['probability'] <= medianProbability]
 
-		rowsToRemove = []
-		for i in range(0,len(self.data)):
-			if (self.data[i]['probability'] <= medianProbability):
-				rowsToRemove.append(i)
-
-		rowsToRemove = np.array(rowsToRemove)
-		self.data.remove_rows(rowsToRemove)
 
 	def outliers(self, quality = 'probability', highLow = 'high'):
 		# Returns Table of outliers
-		outliers = self.data.copy()
-
-		Q3 = np.percentile(self.outliers[quality], 75 )
-		Q1 = np.percentile(self.outliers[quality], 25)
+		Q3 = np.percentile(self.data[quality], 75 )
+		Q1 = np.percentile(self.data[quality], 25)
 		IQR = Q3 - Q1
 
 		rowsToRemove = []
 
 		if (highLow == 'high'):
 			boundary = Q3 + (1.5 * IQR)
-			for i in range(0,len(outliers)):
-				if (self.outliers[i][quality] <= boundary):
-					rowsToRemove.append(i)
+                        return self.data[self.data['quality'] > boundary]
 		elif (highLow == 'low'):
 			boundary = Q1 - (1.5*IQR)
-			for i in range(0,len(outliers)):
-				if (self.outliers[i][quality] >= boundary):
-					rowsToRemove.append(i)
+                        return self.data[self.data['quality'] < boundary]
 		else:
-			print 'ERROR'
+			raise ValueError('highLow much be either "high" or "low".')
 
-		rowsToRemove = np.array(rowsToRemove)
 
-		outliers.remove_rows(rowsToRemove)
-
-		return outliers
 '''
 	def groupPhotonsAngle(self, quality = 'polangle', increment = 0.1):
 		# This returns the sum of the probabilities of phots within the same increment
@@ -486,7 +455,7 @@ class plotter():
 	def probability_polarization(self, dataTable):
 
 
-		
+
 	def outliers(self, quality = 'probability'):
 		# Returns table of photons whose 'quality' is an outlier. Quality could be probability, polarization, etc.
 
@@ -496,14 +465,3 @@ class plotter():
 
 
 '''
-
-
-
-
-
-
-
-
-
-
-
