@@ -3,9 +3,10 @@ import matplotlib.pyplot as plt
 #from mpl_toolkits.mplot3d import axes3d
 from astropy.table import Table, Column, vstack
 from transforms3d.euler import euler2mat
-from transforms3d.affines import compose
+from transforms3d.affines import compose, decompose
 
 import os
+import datetime
 
 from marxs.source.labSource import FarLabPointSource, LabPointSource, LabPointSourceCone
 from marxs.optics.baffle import Baffle
@@ -120,8 +121,10 @@ class SourceMLMirror(OpticalElement):
 		return report
 
 
+
 	def generate_photons(self, exposureTime, probability_limit=5e-10):
                 '''Generate Initial Photons
+>>>>>>> master
 
                 Parameters
                 ----------
@@ -133,13 +136,16 @@ class SourceMLMirror(OpticalElement):
 		photons = self.source.generate_photons(exposureTime)
 		reflectedPhotons = self.mirror.process_photons(photons)# Removing photons with zero probability
 
-                reflectedPhotons = reflectedPhotons[reflectedPhotons['probability'] > probability_limit]
+
+		reflectedPhotons = reflectedPhotons[reflectedPhotons['probability'] > probability_limit]
 
 		# Transform the reflected photons from the local coordinate system to the global coordinate system
 
 		reflectedPhotons['dir'] = np.dot(self.pos4d, reflectedPhotons['dir'].T).T
 
 		reflectedPhotons['pos'] = np.dot(self.pos4d, reflectedPhotons['pos'].T).T
+
+		reflectedPhotons['polarization'] = np.dot(self.pos4d, reflectedPhotons['polarization'].T).T
 
 		return reflectedPhotons
 
@@ -176,6 +182,7 @@ class SourceMLMirror(OpticalElement):
 
 	def offset_apparatus(self,offsetMatrix):
 		self.pos4d = np.dot(offsetMatrix, self.defaultApparatusPos4d)
+
 
 
 
@@ -267,7 +274,9 @@ class MLMirrorDetector(OpticalElement):
 
 	def detect_photons(self, photons):
 		reflectedPhotons = self.mirror.process_photons(photons)
+
 		reflectedPhotons = reflectedPhotons[reflectedPhotons['probability'] > 0]
+
 		detectedPhotons = self.detector.process_photons(reflectedPhotons)
 
 		return detectedPhotons
@@ -314,7 +323,9 @@ class staticSimulation():
 
 		Rotation = euler2mat(0,angle,0,"syxz")
 
-		matrix = compose([0,0,0],Rotation,[1,1,1],[0,0,0])
+		currentPosition, currentRotation, currentZoom, currentShear = decompose(self.first.pos4d)
+
+		matrix = compose( currentPosition ,Rotation,[1,1,1],[0,0,0])
 
 		self.first.offset_apparatus(matrix)
 
@@ -331,40 +342,193 @@ class staticSimulation():
 
 		return self.results
 
-class rotatingSimulation():
+class rotation():
 	def __init__(self):
-		self.numberOfAngles = 1 #NUMBER OF ANLGES THAT WILL BE TESTED
-		self.exposureTime = 10000
+		#self.numberOfAngles = 3 #NUMBER OF ANLGES THAT WILL BE TESTED
+		#self.exposureTime = 1000
+
+		# Make a folder to hold the trials
 
 		if not os.path.exists('./RotatingSimulationTrials'):
 			os.mkdir('./RotatingSimulationTrials')
+
+		
+		# Determine current trial number
 
 		self.trialNumber = 0
 
 		while os.path.isdir('./RotatingSimulationTrials/Trial' + str(self.trialNumber)):
 			self.trialNumber = self.trialNumber + 1
 
-		os.mkdir('./RotatingSimulationTrials/Trial' + str(self.trialNumber))
+		
 
 	def __str__(self):
-		return "Resolution: " + str(self.numberOfAngles) + " angles\nExposure Time: " +str(self.exposureTime)
+		return "rotation.run( [static_simulation], [number_of_angles = 3], [exposure_time = 1000])"
 
-	def run(self, angles = 3, exposureTime = 10000):
 
-		self.numberOfAngles = angles
-		self.exposureTime = exposureTime
+	def theTrialNumber(self):
 
-		sim = staticSimulation()
+		self.trialNumber = 0
+		while os.path.isdir('./RotatingSimulationTrials/Trial' + str(self.trialNumber)):
+			self.trialNumber = self.trialNumber + 1
 
-		for i in range(0, self.numberOfAngles):
-			angle = i * (2*np.pi/self.numberOfAngles)
-			print "Running Angle: " + str(angle) + "... \n"
+		return self.trialNumber
+
+	def makeTrialFolder(self, trialNumber = None):
+
+		if trialNumber == None:
+			trialNumber = self.trialNumber
+
+		os.mkdir('./RotatingSimulationTrials/Trial' + str(trialNumber))
+
+
+	def run(self, staticSimulation, numAngles = 3, exposureTime = 1000):
+		# Will also return angle and total probability as 2D array
+
+		startTime = datetime.datetime.now()
+
+		# Make a Folder to Hold This Trial
+		self.makeTrialFolder(self.theTrialNumber())
+
+
+		# These two lines are purely for the returned statistic
+		probabilities = np.array([])
+		angles = np.array([])
+		
+
+		# Create an instance of the simulation
+		sim = staticSimulation #There should be one passed in so all its configurations already get handled
+
+		for i in range(0, numAngles):
+			angle = i * (2*np.pi/numAngles)
+			print "\nRunning Angle: " + str(angle) + "..."
 
 			sim.offset_angle(angle)
 
-			results = sim.run(self.exposureTime)
+			results = sim.run(exposureTime)
 
-			results.write('./RotatingSimulationTrials/Trial' + str(self.trialNumber) + '/Angle' + str(i+1)+ 'of' + str(angles) + '.fits')
+			results.write('./RotatingSimulationTrials/Trial' + str(self.trialNumber) + '/Angle' + str(i+1)+ 'of' + str(numAngles) + '.fits')
+
+			# For returning angle-probability relationship
+			angles = np.append(angles, [angle])
+
+			probability = np.sum(results['probability'])
+			probabilities =np.append(probabilities, [probability])
+
+
+		# Record Runtime
+		endTime = datetime.datetime.now()
+
+		runTime = endTime - startTime
+
+
+		# Set static simulation back to angle zero:
+		sim.offset_angle(0)
+
+
+
+		# Record Trial Data:
+		self.writeTrialDetails('./RotatingSimulationTrials/Trial' + str(self.trialNumber) , sim, numAngles, exposureTime, runTime )
+
+		return [angles, probabilities]
+
+	def writeTrialDetails(self, pathway, simulation, numAngles, exposureTime, runtime):
+
+		trialDetailsFile = open( pathway + "/trialDetails.txt", "w")
+
+		trialDetailsFile.write("Trial Number: " + str(self.trialNumber) + "    " + str(datetime.datetime.now()) + "\n")
+		trialDetailsFile.write("Type: rotation of first half of simulation\n")
+		trialDetailsFile.write("Runtime: " + str(runtime) + '\n\n\n')
+		trialDetailsFile.write("Details:\n")
+		trialDetailsFile.write("-----------------------\n")
+		trialDetailsFile.write("Resolution:\n")
+		trialDetailsFile.write(" -Number of Angles: " + str(numAngles) + "    (" + str(2*np.pi/numAngles) + " radian increments starting at 0.0)"+ '\n')
+		trialDetailsFile.write(" -Exposure Time Per Angle: " + str(exposureTime) + '\n\n\n')
+		trialDetailsFile.write("Structure: \n")
+		trialDetailsFile.write(" -First:\n")
+		trialDetailsFile.write(" --Starting Position (Global):\n" + str(simulation.first.pos4d) +'\n' )
+		trialDetailsFile.write(" --Source Local Position:" + str(simulation.first.source.position) + '\n')
+		trialDetailsFile.write(" --Source Local Direction: " +str(simulation.first.source.dir) + '\n')
+		trialDetailsFile.write(" --Source Openning Angle: " +str(simulation.first.source.deltaphi) + ' steradians\n')
+		trialDetailsFile.write(" --Mirror Local Position: " + str(simulation.first.mirror.geometry['center']) + '\n')
+		trialDetailsFile.write(" --Mirror Local Plane: " + str(simulation.first.mirror.geometry['plane']) + '\n')
+		trialDetailsFile.write(" --Mirror File: " + str(simulation.first.reflFile)+'\n\n')
+		trialDetailsFile.write(" -Second:\n")
+		trialDetailsFile.write(" --Position (Global)\n" + str(simulation.second.pos4d) + '\n')
+		trialDetailsFile.write(" --Detector Local Position: " + str(simulation.second.detector.geometry['plane']) + '\n')
+		trialDetailsFile.write(" --Detector Local Plane: " + str(simulation.second.detector.geometry['plane']) + '\n')
+		trialDetailsFile.write(" --Mirror Local Position: " + str(simulation.second.mirror.geometry['center']) + '\n')
+		trialDetailsFile.write(" --Mirror Local Plane: " + str(simulation.second.mirror.geometry['plane']) + '\n')
+		trialDetailsFile.write(" --Mirror File: " + str(simulation.second.reflFile) + '\n\n\n')
+		trialDetailsFile.write("Source:\n")
+		trialDetailsFile.write(" -Flux: " + str(simulation.first.source.flux) + '\n')
+		trialDetailsFile.write(" -Energy: " + str(simulation.first.source.energy) + '\n')
+
+		trialDetailsFile.close()
+
+
+
+
+
+
+
+
+
+
+'''
+
+class dataSheet():
+	def __init__(self, pathway, name):
+
+		self.pathway = pathway
+
+		self.NFiles = len([f for f in os.listdir(pathway)
+                if os.path.isfile(os.path.join(name, f))])
+
+		self.filename = pathway + name + '.fits'
+
+		if not os.path.exists(self.filename):
+
+			self.dataTable = Table
+
+			self.dataTable['Angle'] = []
+
+			for i in range(0,len(self.NFiles)):
+				inc = 2*np.pi / self.NFiles
+				angle = i * inc
+
+				self.dataTable['Angle'][i] = angle
+
+
+			self.dataTable.write(self.filename)
+		else:
+			self.dataTable = Table.read(self.filename)
+
+
+
+	def add_total_probabilities(self, *args):
+
+		filenames = args
+
+		self.dataTable = Table.read(self.filename)
+
+		self.dataTable['Total Probability'] = []
+
+		probabilities = []
+
+		for i in range(0, len(args)):
+			photonTable = Table.read( self.pathway + "/" +filenames[i])
+			probability = np.sum(photonTable['probability'])
+
+			self.dataTable['Total Probability'] = np.append(self.dataTable['Total Probability'], [probability])
+
+		self.dataTable.write(self.filename)
+
+
+
+
+
+'''
 
 
 
