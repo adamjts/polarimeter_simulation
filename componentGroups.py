@@ -58,7 +58,7 @@ class SourceMLMirror(OpticalElement):
         pos4d = self.defaultMirrorPos4d); return mirror
 
 
-	def __init__(self, reflFile, testedPolarization, openningAngle = 0.05, sourceDistance = 500, **kwargs):
+	def __init__(self, reflFile, testedPolarization, openningAngle = 0.01, sourceDistance = 50, **kwargs):
 		super(SourceMLMirror, self).__init__(**kwargs)
 		self.defaultApparatusPos4d = self.pos4d
 
@@ -532,7 +532,10 @@ class graphs():
 	#def makeCCDImage(self):
 
 
-	def probabilities(self):
+	def probabilities(self, trialNumber = None):
+
+		if trialNumber != None:
+			self.changeTrialNumber(trialNumber)
 
 		probabilities = []
 		angles = []
@@ -554,7 +557,7 @@ class graphs():
 		probabilities = np.array(probabilities)
 		angles = np.array(angles)
 
-
+		plt.clf()
 		plt.plot(angles, probabilities)
 
 		plt.ylabel('Probability')
@@ -566,6 +569,18 @@ class graphs():
 		return np.array([angles, probabilities])
 
 		#for table in range(0, len())
+
+	def CCD(self, trialNumber = None):
+
+		if trialNumber != None :
+			self.changeTrialNumber(trialNumber)
+
+
+		#higher probability is higher opacity
+
+
+
+
 
 
 
