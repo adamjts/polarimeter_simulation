@@ -1,5 +1,4 @@
 Jason Frost
-8/11/15
 
 polarimeter_simulation
 
@@ -33,3 +32,11 @@ you want to add a new mirror.
 sample_data: This directory contains a few saved numpy arrays of photon counts
 from simulations that involved a full source rotation, as well as the
 corresponding graphs of those arrays. Some simulated images are also included.
+
+
+
+*********************************************************************************
+
+Adam Theriault-Shay
+
+ComponentGroups.py
