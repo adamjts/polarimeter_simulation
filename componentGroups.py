@@ -584,25 +584,37 @@ class graphs():
 
 		numAngles = self.numFitsFiles()
 
+
+		# Find the maximum probability over all angles:
+		maxprob = 0
+		for k in range(0, numAngles):
+			photonTable = Table.read('./RotatingSimulationTrials/Trial' + str(self.trialNumber) + '/Angle' + str(k+1) + 'of' +str(numAngles) + '.fits')
+
+			if len(photonTable) > 0:
+				localmax = np.max(photonTable['probability'])
+
+				if localmax > maxprob:
+					maxprob = localmax
+
+		tenth = maxprob / 10
+
+
+
+
+		# Make the graphs
+
 		for i in range(0, numAngles):
+			# For this angle Graph...
 			photonTable = Table.read('./RotatingSimulationTrials/Trial' + str(self.trialNumber) + '/Angle' + str(i+1) + 'of' +str(numAngles) + '.fits')
 
 			plt.clf()
 
-			# find the maximum probability for this table
 
-			if len(photonTable) > 0:
-				maxprob = np.max(photonTable['probability'])
-			else:
-				maxprob = 0
-
-			#divide into decile increments
-
-			tenth = maxprob / 10
-
-			# Now graph each decile
+			# Now graph each decile on the same graph
 			photons = photonTable.copy()
 
+
+			# Graph each decile of probability with a different opacity
 			for j in range(0,10):
 
 				photonsToGraph = photons[photons['probability'] <= ((j+1)*tenth)] # upper limit
@@ -617,6 +629,10 @@ class graphs():
 
 			plt.xlabel('x-axis-mm')
 			plt.ylabel('y-axis-mm')
+			plt.xlim( -15, 15)
+			plt.ylim(-15,15)
+			# CCD borders:
+			plt.plot([12.288,12.288,-12.288,-12.288, 12.288], [-12.288,12.288,12.288,-12.288, -12.288], linestyle='-', color = 'r')
 
 			plt.savefig('./RotatingSimulationTrials/Trial' + str(self.trialNumber) + '/graphs/CCD/Angle' + str(i+1) )
 
