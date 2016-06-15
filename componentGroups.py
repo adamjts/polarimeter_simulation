@@ -1,5 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
+#import marxs.visualization.mayavi
+#from mayavi import mlab
 #from mpl_toolkits.mplot3d import axes3d
 from astropy.table import Table, Column, vstack
 from transforms3d.euler import euler2mat
@@ -15,6 +17,7 @@ from marxs.optics.grating import FlatGrating
 from marxs.optics.detector import FlatDetector
 from marxs.optics import OpticalElement
 from marxs.optics.polarization import polarization_vectors
+from marxs.math.pluecker import h2e
 
 from energyDistributions import createEnergyTable
 
@@ -55,7 +58,7 @@ class SourceMLMirror(OpticalElement):
         pos4d = self.defaultMirrorPos4d); return mirror
 
 
-	def __init__(self, reflFile, testedPolarization, openningAngle = 0.05, sourceDistance = 500, **kwargs):
+	def __init__(self, reflFile, testedPolarization, openningAngle = 0.01, sourceDistance = 50, **kwargs):
 		super(SourceMLMirror, self).__init__(**kwargs)
 		self.defaultApparatusPos4d = self.pos4d
 
@@ -124,7 +127,6 @@ class SourceMLMirror(OpticalElement):
 
 	def generate_photons(self, exposureTime, probability_limit=5e-10):
                 '''Generate Initial Photons
->>>>>>> master
 
                 Parameters
                 ----------
@@ -146,6 +148,7 @@ class SourceMLMirror(OpticalElement):
 		reflectedPhotons['pos'] = np.dot(self.pos4d, reflectedPhotons['pos'].T).T
 
 		reflectedPhotons['polarization'] = np.dot(self.pos4d, reflectedPhotons['polarization'].T).T
+
 
 		return reflectedPhotons
 
@@ -332,13 +335,18 @@ class staticSimulation():
 
 
 	def run(self, exposureTime = 1000):
+
+
 		# Generating photons that travel down the beamline
 		print "Generating Cross Photons..."
 		cross = self.first.generate_photons(exposureTime)
 
+
 		# Receive Photons on other side
 		print "Receiving Photons..."
 		self.results = self.second.detect_photons(cross)
+
+
 
 		return self.results
 
@@ -475,6 +483,306 @@ class rotation():
 
 
 
+
+
+
+
+
+
+#*********************    PLOTTING     ****************************
+
+
+
+class graphs():
+	# This will have methods to generate common graphs of interest
+
+	def __init__(self, trialNumber):
+
+
+		self.trialNumber = trialNumber
+
+		self.pathway = './RotatingSimulationTrials/Trial' + str(self.trialNumber) + '/graphs'
+
+		if not os.path.exists(self.pathway):
+			os.mkdir(self.pathway)
+		# Make a Graphs folder
+
+	def numFitsFiles(self):
+
+		fitsCounter = 0
+		for root, dirs, files in os.walk('./RotatingSimulationTrials/Trial' + str(self.trialNumber)):
+			for file in files:    
+				if file.endswith('.fits'):
+					fitsCounter += 1
+
+		return fitsCounter
+
+
+
+	def changeTrialNumber(self, trialNumber):
+
+		self.trialNumber = trialNumber
+
+		self.pathway = './RotatingSimulationTrials/Trial' + str(self.trialNumber) + '/graphs'
+
+		if not os.path.exists(self.pathway):
+			os.mkdir(self.pathway)
+
+
+	#def makeCCDImage(self):
+
+
+	def probabilities(self, trialNumber = None):
+
+		if trialNumber != None:
+			self.changeTrialNumber(trialNumber)
+
+		probabilities = []
+		angles = []
+
+		numAngles = self.numFitsFiles()
+
+		for i in range(0, numAngles):
+
+			photons = Table.read('./RotatingSimulationTrials/Trial' + str(self.trialNumber) + '/Angle' + str(i+1) + 'of' + str(numAngles) + '.fits')
+
+			totalProbability = np.sum(photons['probability'])
+
+			probabilities = probabilities + [totalProbability]
+
+			angle = i*(2*np.pi/numAngles)
+
+			angles = angles + [angle]
+
+		probabilities = np.array(probabilities)
+		angles = np.array(angles)
+
+		plt.clf()
+		plt.plot(angles, probabilities)
+
+		plt.ylabel('Probability')
+		plt.xlabel('Angle of Rotation (Radians)')
+
+		plt.savefig('./RotatingSimulationTrials/Trial' + str(self.trialNumber) + '/graphs/probability_to_angle')
+
+
+		return np.array([angles, probabilities])
+
+		#for table in range(0, len())
+
+	def CCD(self, trialNumber = None):
+
+		if trialNumber != None :
+			self.changeTrialNumber(trialNumber)
+
+
+		# CCD folder for the graphs at each angle
+
+		if not os.path.exists(self.pathway + '/CCD'):
+			os.mkdir(self.pathway + '/CCD')
+
+
+		numAngles = self.numFitsFiles()
+
+
+		# Find the maximum probability over all angles:
+		maxprob = 0
+		for k in range(0, numAngles):
+			photonTable = Table.read('./RotatingSimulationTrials/Trial' + str(self.trialNumber) + '/Angle' + str(k+1) + 'of' +str(numAngles) + '.fits')
+
+			if len(photonTable) > 0:
+				localmax = np.max(photonTable['probability'])
+
+				if localmax > maxprob:
+					maxprob = localmax
+
+		tenth = maxprob / 10
+
+
+
+
+		# Make the graphs
+
+		for i in range(0, numAngles):
+			# For this angle Graph...
+			photonTable = Table.read('./RotatingSimulationTrials/Trial' + str(self.trialNumber) + '/Angle' + str(i+1) + 'of' +str(numAngles) + '.fits')
+
+			plt.clf()
+
+
+			# Now graph each decile on the same graph
+			photons = photonTable.copy()
+
+
+			# Graph each decile of probability with a different opacity
+			for j in range(0,10):
+
+				photonsToGraph = photons[photons['probability'] <= ((j+1)*tenth)] # upper limit
+
+				photonsToGraph = photonsToGraph[photonsToGraph['probability'] > (j*tenth)] #lower limit
+
+				if len(photonsToGraph) >0 :
+					opacity = ((j+1)*tenth/maxprob)
+					if (opacity > 1.0):
+						opacity = 1
+					plt.scatter(photonsToGraph['det_x'], photonsToGraph['det_y'], alpha = opacity)
+
+			plt.xlabel('x-axis-mm')
+			plt.ylabel('y-axis-mm')
+			plt.xlim( -15, 15)
+			plt.ylim(-15,15)
+			# CCD borders:
+			plt.plot([12.288,12.288,-12.288,-12.288, 12.288], [-12.288,12.288,12.288,-12.288, -12.288], linestyle='-', color = 'r')
+
+			plt.savefig('./RotatingSimulationTrials/Trial' + str(self.trialNumber) + '/graphs/CCD/Angle' + str(i+1) )
+
+
+
+
+
+
+
+
+
+
+
+class rayTrace():
+
+	def __init__(self):
+		#nothing yet
+		print 'init'
+
+	def render(self, simulation, exposureTime = 1000):
+		sim = simulation
+
+
+		cross = sim.first.generate_photons(exposureTime)
+
+		arr = np.arange(len(cross) * 4*4, dtype = float).reshape(len(cross), 4,4)
+
+		positions = Table(arr, names = ('source', 'firstMirror', 'secondMirror', 'detector'))
+
+
+
+		positions['source'] = np.dot(sim.first.pos4d, np.array(sim.first.source.position + [1]).T).T
+
+
+		positions['firstMirror'] = cross['pos']
+
+		secondMirror = sim.second.mirror.process_photons(cross)
+
+		positions['secondMirror'] = secondMirror['pos']
+
+		detected = sim.second.detector.process_photons(secondMirror)
+
+		positions['detector'] = detected['pos']
+
+
+		pathways = []
+
+		for i in range(0, len(positions)):
+			path = np.array([h2e(positions[i]['source']),h2e(positions[i]['firstMirror']), h2e(positions[i]['secondMirror']), h2e(positions[i]['detector'])])
+
+			path = path.T
+
+			pathways = pathways + [path]
+
+		pathways = np.array(pathways)
+
+		#mlab.plot3d(xs, ys, zs, tube_radius = 0.5)
+
+		#fig.plot3d(path[0],path[1], path[2], tube_radius = 0.5)
+		#marxs.visualization.mayavi.plot_rays(d, viewer=fig)
+
+		return pathways
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+'''
+class DataDetails():
+	#This is for a single angle
+	def __init__(self, data):
+		self.data = data.copy()
+
+	def filterProbabilities(self):
+		# Removes from self.data photons w/ probability < median probability
+		medianProbability = np.median(self.data['probability'])
+                self.data = data[data['probability'] <= medianProbability]
+
+
+	def outliers(self, quality = 'probability', highLow = 'high'):
+		# Returns Table of outliers
+		Q3 = np.percentile(self.data[quality], 75 )
+		Q1 = np.percentile(self.data[quality], 25)
+		IQR = Q3 - Q1
+
+		rowsToRemove = []
+
+		if (highLow == 'high'):
+			boundary = Q3 + (1.5 * IQR)
+                        return self.data[self.data['quality'] > boundary]
+		elif (highLow == 'low'):
+			boundary = Q1 - (1.5*IQR)
+                        return self.data[self.data['quality'] < boundary]
+		else:
+			raise ValueError('highLow much be either "high" or "low".')
+'''
+
+'''
+	def groupPhotonsAngle(self, quality = 'polangle', increment = 0.1):
+		# This returns the sum of the probabilities of phots within the same increment
+		number_of_increments = (2*np.pi) / increment
+
+		groupData = self.data.copy()
+
+		probabilities=np.array([])
+
+		angleIncrements = np.arange((increment/2), 2*np.pi, increment)
+
+		for inc in range(0, int(number_of_increments + 1)):
+			lowerPercentile = (100/number_of_increments) * inc
+			upperPercentile = (100/number_of_increments) * (inc+1)
+
+			lowerBound = np.percentile((2*np.pi), lowerPercentile)
+			upperBound = np.percentile((2*np.pi), upperPercentile)
+
+			probabilityPerIncrement = 0
+
+			for i in range(0, len(groupData)):
+				angle = groupData['polangle'][i]
+				if ((angle >= lowerBound) and (angle < upperBound)):
+					probabilityPerIncrement += groupData['probability'][i]
+
+
+			probabilities = np.append(probabilities, [probabilityPerIncrement])
+
+
+		return np.array([angleIncrements, probabilities])'''
+
+
+
+
+
+
+
+
 '''
 
 class dataSheet():
@@ -529,82 +837,6 @@ class dataSheet():
 
 
 '''
-
-
-
-
-
-
-
-
-#*********************    PLOTTING     ****************************
-
-class DataDetails():
-	#This is for a single angle
-	def __init__(self, data):
-		self.data = data.copy()
-
-	def filterProbabilities(self):
-		# Removes from self.data photons w/ probability < median probability
-		medianProbability = np.median(self.data['probability'])
-                self.data = data[data['probability'] <= medianProbability]
-
-
-	def outliers(self, quality = 'probability', highLow = 'high'):
-		# Returns Table of outliers
-		Q3 = np.percentile(self.data[quality], 75 )
-		Q1 = np.percentile(self.data[quality], 25)
-		IQR = Q3 - Q1
-
-		rowsToRemove = []
-
-		if (highLow == 'high'):
-			boundary = Q3 + (1.5 * IQR)
-                        return self.data[self.data['quality'] > boundary]
-		elif (highLow == 'low'):
-			boundary = Q1 - (1.5*IQR)
-                        return self.data[self.data['quality'] < boundary]
-		else:
-			raise ValueError('highLow much be either "high" or "low".')
-
-
-'''
-	def groupPhotonsAngle(self, quality = 'polangle', increment = 0.1):
-		# This returns the sum of the probabilities of phots within the same increment
-		number_of_increments = (2*np.pi) / increment
-
-		groupData = self.data.copy()
-
-		probabilities=np.array([])
-
-		angleIncrements = np.arange((increment/2), 2*np.pi, increment)
-
-		for inc in range(0, int(number_of_increments + 1)):
-			lowerPercentile = (100/number_of_increments) * inc
-			upperPercentile = (100/number_of_increments) * (inc+1)
-
-			lowerBound = np.percentile((2*np.pi), lowerPercentile)
-			upperBound = np.percentile((2*np.pi), upperPercentile)
-
-			probabilityPerIncrement = 0
-
-			for i in range(0, len(groupData)):
-				angle = groupData['polangle'][i]
-				if ((angle >= lowerBound) and (angle < upperBound)):
-					probabilityPerIncrement += groupData['probability'][i]
-
-
-			probabilities = np.append(probabilities, [probabilityPerIncrement])
-
-
-		return np.array([angleIncrements, probabilities])'''
-
-
-
-
-
-
-
 
 
 
