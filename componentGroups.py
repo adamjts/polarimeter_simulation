@@ -576,7 +576,51 @@ class graphs():
 			self.changeTrialNumber(trialNumber)
 
 
-		#higher probability is higher opacity
+		# CCD folder for the graphs at each angle
+
+		if not os.path.exists(self.pathway + '/CCD'):
+			os.mkdir(self.pathway + '/CCD')
+
+
+		numAngles = self.numFitsFiles()
+
+		for i in range(0, numAngles):
+			photonTable = Table.read('./RotatingSimulationTrials/Trial' + str(self.trialNumber) + '/Angle' + str(i+1) + 'of' +str(numAngles) + '.fits')
+
+			plt.clf()
+
+			# find the maximum probability for this table
+
+			if len(photonTable) > 0:
+				maxprob = np.max(photonTable['probability'])
+			else:
+				maxprob = 0
+
+			#divide into decile increments
+
+			tenth = maxprob / 10
+
+			# Now graph each decile
+			photons = photonTable.copy()
+
+			for j in range(0,10):
+
+				photonsToGraph = photons[photons['probability'] <= ((j+1)*tenth)] # upper limit
+
+				photonsToGraph = photonsToGraph[photonsToGraph['probability'] > (j*tenth)] #lower limit
+
+				if len(photonsToGraph) >0 :
+					opacity = ((j+1)*tenth/maxprob)
+					if (opacity > 1.0):
+						opacity = 1
+					plt.scatter(photonsToGraph['det_x'], photonsToGraph['det_y'], alpha = opacity)
+
+			plt.xlabel('x-axis-mm')
+			plt.ylabel('y-axis-mm')
+
+			plt.savefig('./RotatingSimulationTrials/Trial' + str(self.trialNumber) + '/graphs/CCD/Angle' + str(i+1) )
+
+
 
 
 
