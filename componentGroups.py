@@ -50,6 +50,7 @@ class SourceMLMirror(OpticalElement):
 		self.defaultMirrorOrientation = euler2mat(-np.pi/4, 0, 0, 'syxz')
 		self.defaultMirrorOrientation = np.dot(euler2mat(0,-np.pi/2,0,'syxz'),self.defaultMirrorOrientation)
 
+
 		self.defaultMirrorPosition = np.array([0,0,0])
 
 		self.defaultMirrorPos4d = compose(self.defaultMirrorPosition, self.defaultMirrorOrientation, np.array([1, 24.5, 12]), np.zeros(3))
@@ -58,7 +59,7 @@ class SourceMLMirror(OpticalElement):
         pos4d = self.defaultMirrorPos4d); return mirror
 
 
-	def __init__(self, reflFile, testedPolarization, openningAngle = 0.01, sourceDistance = 50, **kwargs):
+	def __init__(self, reflFile, testedPolarization, openningAngle = 0.05, sourceDistance = 100, **kwargs):
 		super(SourceMLMirror, self).__init__(**kwargs)
 		self.defaultApparatusPos4d = self.pos4d
 
@@ -198,9 +199,11 @@ class MLMirrorDetector(OpticalElement):
 		self.testedPolarization = testedPolarization
 
 		#mirror Defauls
+	
 		self.defaultMirrorOrientation = euler2mat(-np.pi/4, 0, 0, 'syxz')
 		self.defaultMirrorOrientation = np.dot(euler2mat(0,-np.pi/2,0,'syxz'),self.defaultMirrorOrientation)
 		self.defaultMirrorOrientation = np.dot(euler2mat(np.pi,0,0,'syxz'),self.defaultMirrorOrientation)
+
 
 		self.defaultMirrorPosition = np.array([0,0,0])
 
@@ -212,8 +215,10 @@ class MLMirrorDetector(OpticalElement):
 
 	def defaultDetector(self, detectorDistance):
 		self.defaultDetectorOrientation = euler2mat(0, 0 , -np.pi/2, 'syxz')
+		self.defaultDetectorOrientation = np.dot(euler2mat(np.pi/2, 0, 0, 'syxz'), self.defaultDetectorOrientation)
 		self.defaultDetectorPosition = np.array([0, detectorDistance, 0])
-		self.defaultDetectorPos4d = compose(self.defaultDetectorPosition, self.defaultDetectorOrientation, [1, 12.288, 12.288], np.zeros(3))
+		self.defaultDetectorPos4d = compose(self.defaultDetectorPosition, self.defaultDetectorOrientation, [1, 12.288*3, 12.288*3], np.zeros(3))
+		# True zoom is [1,12.288,12.288]
 		detector = FlatDetector(pixsize=24.576e-3, pos4d = self.defaultDetectorPos4d)
 
 		return detector
@@ -301,7 +306,7 @@ class staticSimulation():
 		self.second = MLMirrorDetector(secondMirrorREFL, secondMirrorPOL)
 
 
-		self.distanceBetweenHalves = 50
+		self.distanceBetweenHalves = 500
 		self.angleOffset = 0
 
 		Rotation = euler2mat(0,0,0,'syxz')
@@ -331,6 +336,17 @@ class staticSimulation():
 		matrix = compose( currentPosition ,Rotation,[1,1,1],[0,0,0])
 
 		self.first.offset_apparatus(matrix)
+
+	def move_first(self, displacement = [0,0,0]):
+
+		currentPosition, currentRotation, currentZoom, currentShear = decompose(self.first.pos4d)
+
+		position = np.array(currentPosition) + np.array(displacement)
+
+		matrix = compose( position, currentRotation, [1,1,1], [0,0,0])
+
+		self.first.offset_apparatus(matrix)
+
 
 
 
@@ -463,8 +479,9 @@ class rotation():
 		trialDetailsFile.write(" --Mirror File: " + str(simulation.first.reflFile)+'\n\n')
 		trialDetailsFile.write(" -Second:\n")
 		trialDetailsFile.write(" --Position (Global)\n" + str(simulation.second.pos4d) + '\n')
-		trialDetailsFile.write(" --Detector Local Position: " + str(simulation.second.detector.geometry['plane']) + '\n')
+		trialDetailsFile.write(" --Detector Local Position: " + str(simulation.second.detector.geometry['center']) + '\n')
 		trialDetailsFile.write(" --Detector Local Plane: " + str(simulation.second.detector.geometry['plane']) + '\n')
+		trialDetailsFile.write(" --Detector Dimensions: v_y=" + str(simulation.second.detector.geometry['v_y']) + ' v_z=' +str(simulation.second.detector.geometry['v_z']) + '\n')
 		trialDetailsFile.write(" --Mirror Local Position: " + str(simulation.second.mirror.geometry['center']) + '\n')
 		trialDetailsFile.write(" --Mirror Local Plane: " + str(simulation.second.mirror.geometry['plane']) + '\n')
 		trialDetailsFile.write(" --Mirror File: " + str(simulation.second.reflFile) + '\n\n\n')
@@ -629,8 +646,10 @@ class graphs():
 
 			plt.xlabel('x-axis-mm')
 			plt.ylabel('y-axis-mm')
-			plt.xlim( -15, 15)
-			plt.ylim(-15,15)
+			plt.xlim( -15*3, 15*3)
+			plt.ylim(-15*3,15*3)
+
+			#True detector size is 12.288 x 12.288
 			# CCD borders:
 			plt.plot([12.288,12.288,-12.288,-12.288, 12.288], [-12.288,12.288,12.288,-12.288, -12.288], linestyle='-', color = 'r')
 
