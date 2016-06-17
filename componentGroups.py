@@ -205,7 +205,7 @@ class MLMirrorDetector(OpticalElement):
 		self.defaultMirrorOrientation = np.dot(euler2mat(np.pi,0,0,'syxz'),self.defaultMirrorOrientation)
 
 
-		self.defaultMirrorPosition = np.array([0,0,0])
+		self.defaultMirrorPosition = np.array([0,0,-10])
 
 		self.defaultMirrorPos4d = compose(self.defaultMirrorPosition, self.defaultMirrorOrientation, np.array([1, 24.5, 12]), np.zeros(3))
 
@@ -350,12 +350,34 @@ class staticSimulation():
 
 
 
-	def run(self, exposureTime = 1000):
+	def run(self, exposureTime = 1000, IntermediateDetector=False):
 
 
 		# Generating photons that travel down the beamline
 		print "Generating Cross Photons..."
 		cross = self.first.generate_photons(exposureTime)
+
+		if IntermediateDetector:
+			# place large detector midwat between the mirrors
+
+			# correct Location
+			mirrorPosition = np.dot(self.first.pos4d, self.first.mirror.geometry['center'])
+			detectorLocation = mirrorPosition/2
+			detectorLocation = detectorLocation[0:3]
+
+			# Correct Orientation
+			detectorRotation = euler2mat(0,-np.pi/2,0,'syxz')
+
+			# Combine
+			detectorPos4d = compose(detectorLocation, detectorRotation, [1, 3*12.288,3*12.288], np.zeros(3))
+
+			detector = FlatDetector(pixsize=24.576e-3, pos4d = detectorPos4d)
+
+			self.intermediateResults = detector.process_photons(cross)
+
+			self.intermediateResults = self.intermediateResults[self.intermediateResults['probability']>0]
+
+
 
 
 		# Receive Photons on other side
@@ -363,8 +385,10 @@ class staticSimulation():
 		self.results = self.second.detect_photons(cross)
 
 
-
-		return self.results
+		if IntermediateDetector:
+			return self.results, self.intermediateResults
+		else:
+			return self.results
 
 class rotation():
 	def __init__(self):
@@ -403,16 +427,36 @@ class rotation():
 		if trialNumber == None:
 			trialNumber = self.trialNumber
 
+
 		os.mkdir('./RotatingSimulationTrials/Trial' + str(trialNumber))
 
+		os.mkdir('./RotatingSimulationTrials/Trial' + str(trialNumber) + '/DetectedPhotons')
 
-	def run(self, staticSimulation, numAngles = 3, exposureTime = 1000):
+	def makeTrialFolderIntermediates(self, trialNumber = None):
+
+		if trialNumber == None:
+			trialNumber = self.trialNumber
+
+		os.mkdir('./RotatingSimulationTrials/Trial' + str(trialNumber) + '/IntermediatePhotons')
+
+
+	def run(self, staticSimulation, numAngles = 3, exposureTime = 1000, intermediates = False):
+
+
+
 		# Will also return angle and total probability as 2D array
 
 		startTime = datetime.datetime.now()
 
+		trialNumber = self.theTrialNumber()
+
 		# Make a Folder to Hold This Trial
-		self.makeTrialFolder(self.theTrialNumber())
+		self.makeTrialFolder(trialNumber)
+
+		# Folder for intermediate photons
+		if intermediates:
+			self.makeTrialFolderIntermediates(trialNumber)
+
 
 
 		# These two lines are purely for the returned statistic
@@ -429,9 +473,15 @@ class rotation():
 
 			sim.offset_angle(angle)
 
-			results = sim.run(exposureTime)
+			if intermediates:
+				results, intermediatePhotons = sim.run(exposureTime, intermediates)
+			else:
+				results = sim.run(exposureTime)
 
-			results.write('./RotatingSimulationTrials/Trial' + str(self.trialNumber) + '/Angle' + str(i+1)+ 'of' + str(numAngles) + '.fits')
+			results.write('./RotatingSimulationTrials/Trial' + str(self.trialNumber) + '/DetectedPhotons' +'/Angle' + str(i+1)+ 'of' + str(numAngles) + '.fits')
+
+			if intermediates:
+				intermediatePhotons.write('./RotatingSimulationTrials/Trial' + str(self.trialNumber) + '/IntermediatePhotons/Angle' + str(i+1)+ 'of' + str(numAngles) + '.fits')
 
 			# For returning angle-probability relationship
 			angles = np.append(angles, [angle])
@@ -452,16 +502,17 @@ class rotation():
 
 
 		# Record Trial Data:
-		self.writeTrialDetails('./RotatingSimulationTrials/Trial' + str(self.trialNumber) , sim, numAngles, exposureTime, runTime )
+		self.writeTrialDetails('./RotatingSimulationTrials/Trial' + str(self.trialNumber) , sim, numAngles, exposureTime, runTime, intermediates )
 
 		return [angles, probabilities]
 
-	def writeTrialDetails(self, pathway, simulation, numAngles, exposureTime, runtime):
+	def writeTrialDetails(self, pathway, simulation, numAngles, exposureTime, runtime, intermediates):
 
 		trialDetailsFile = open( pathway + "/trialDetails.txt", "w")
 
 		trialDetailsFile.write("Trial Number: " + str(self.trialNumber) + "    " + str(datetime.datetime.now()) + "\n")
 		trialDetailsFile.write("Type: rotation of first half of simulation\n")
+		trialDetailsFile.write("IntermediatePhotons Recorded: " + str(intermediates) + '\n')
 		trialDetailsFile.write("Runtime: " + str(runtime) + '\n\n\n')
 		trialDetailsFile.write("Details:\n")
 		trialDetailsFile.write("-----------------------\n")
@@ -518,16 +569,20 @@ class graphs():
 
 		self.trialNumber = trialNumber
 
-		self.pathway = './RotatingSimulationTrials/Trial' + str(self.trialNumber) + '/graphs'
+		self.pathway = './RotatingSimulationTrials/Trial' + str(self.trialNumber)
 
-		if not os.path.exists(self.pathway):
-			os.mkdir(self.pathway)
-		# Make a Graphs folder
+		# Make a Graphs folders
+		if not os.path.exists(self.pathway + '/DetectedPhotons/graphs'):
+			os.mkdir(self.pathway + '/DetectedPhotons/graphs')
+
+		if not os.path.exists(self.pathway + '/IntermediatePhotons/graphs'):
+			os.mkdir(self.pathway + '/IntermediatePhotons/graphs')
+		
 
 	def numFitsFiles(self):
 
 		fitsCounter = 0
-		for root, dirs, files in os.walk('./RotatingSimulationTrials/Trial' + str(self.trialNumber)):
+		for root, dirs, files in os.walk('./RotatingSimulationTrials/Trial' + str(self.trialNumber) + '/DetectedPhotons'):
 			for file in files:    
 				if file.endswith('.fits'):
 					fitsCounter += 1
@@ -540,10 +595,14 @@ class graphs():
 
 		self.trialNumber = trialNumber
 
-		self.pathway = './RotatingSimulationTrials/Trial' + str(self.trialNumber) + '/graphs'
+		self.pathway = './RotatingSimulationTrials/Trial' + str(self.trialNumber)
 
-		if not os.path.exists(self.pathway):
-			os.mkdir(self.pathway)
+		if not os.path.exists(self.pathway + '/DetectedPhotons/graphs'):
+			os.mkdir(self.pathway + '/DetectedPhotons/graphs')
+
+		if not os.path.exists(self.pathway + '/IntermediatePhotons/graphs'):
+			os.mkdir(self.pathway + '/IntermediatePhotons/graphs')
+
 
 
 	#def makeCCDImage(self):
@@ -561,7 +620,7 @@ class graphs():
 
 		for i in range(0, numAngles):
 
-			photons = Table.read('./RotatingSimulationTrials/Trial' + str(self.trialNumber) + '/Angle' + str(i+1) + 'of' + str(numAngles) + '.fits')
+			photons = Table.read(self.pathway + '/DetectedPhotons'+ '/Angle' + str(i+1) + 'of' + str(numAngles) + '.fits')
 
 			totalProbability = np.sum(photons['probability'])
 
@@ -580,7 +639,7 @@ class graphs():
 		plt.ylabel('Probability')
 		plt.xlabel('Angle of Rotation (Radians)')
 
-		plt.savefig('./RotatingSimulationTrials/Trial' + str(self.trialNumber) + '/graphs/probability_to_angle')
+		plt.savefig(self.pathway + '/DetectedPhotons/graphs/probability_to_angle')
 
 
 		return np.array([angles, probabilities])
@@ -595,8 +654,8 @@ class graphs():
 
 		# CCD folder for the graphs at each angle
 
-		if not os.path.exists(self.pathway + '/CCD'):
-			os.mkdir(self.pathway + '/CCD')
+		if not os.path.exists(self.pathway + '/DetectedPhotons/graphs/CCD'):
+			os.mkdir(self.pathway + '/DetectedPhotons/graphs/CCD')
 
 
 		numAngles = self.numFitsFiles()
@@ -605,7 +664,7 @@ class graphs():
 		# Find the maximum probability over all angles:
 		maxprob = 0
 		for k in range(0, numAngles):
-			photonTable = Table.read('./RotatingSimulationTrials/Trial' + str(self.trialNumber) + '/Angle' + str(k+1) + 'of' +str(numAngles) + '.fits')
+			photonTable = Table.read(self.pathway+ '/DetectedPhotons/Angle' + str(k+1) + 'of' +str(numAngles) + '.fits')
 
 			if len(photonTable) > 0:
 				localmax = np.max(photonTable['probability'])
@@ -616,13 +675,11 @@ class graphs():
 		tenth = maxprob / 10
 
 
-
-
 		# Make the graphs
 
 		for i in range(0, numAngles):
 			# For this angle Graph...
-			photonTable = Table.read('./RotatingSimulationTrials/Trial' + str(self.trialNumber) + '/Angle' + str(i+1) + 'of' +str(numAngles) + '.fits')
+			photonTable = Table.read(self.pathway + '/DetectedPhotons/Angle' + str(i+1) + 'of' +str(numAngles) + '.fits')
 
 			plt.clf()
 
@@ -653,7 +710,120 @@ class graphs():
 			# CCD borders:
 			plt.plot([12.288,12.288,-12.288,-12.288, 12.288], [-12.288,12.288,12.288,-12.288, -12.288], linestyle='-', color = 'r')
 
-			plt.savefig('./RotatingSimulationTrials/Trial' + str(self.trialNumber) + '/graphs/CCD/Angle' + str(i+1) )
+			plt.savefig(self.pathway+ '/DetectedPhotons/graphs/CCD/Angle' + str(i+1) )
+
+
+
+	def probabilities_Intermediates(self, trialNumber = None):
+
+		if trialNumber != None:
+			self.changeTrialNumber(trialNumber)
+
+		probabilities = []
+		angles = []
+
+		numAngles = self.numFitsFiles()
+
+		for i in range(0, numAngles):
+
+			photons = Table.read(self.pathway + '/IntermediatePhotons'+ '/Angle' + str(i+1) + 'of' + str(numAngles) + '.fits')
+
+			totalProbability = np.sum(photons['probability'])
+
+			probabilities = probabilities + [totalProbability]
+
+			angle = i*(2*np.pi/numAngles)
+
+			angles = angles + [angle]
+
+		probabilities = np.array(probabilities)
+		angles = np.array(angles)
+
+		plt.clf()
+		plt.plot(angles, probabilities)
+
+		plt.ylabel('Probability')
+		plt.xlabel('Angle of Rotation (Radians)')
+
+		plt.savefig(self.pathway + '/IntermediatePhotons/graphs/probability_to_angle')
+
+
+		return np.array([angles, probabilities])
+
+
+	def CCD_Intermediates(self, trialNumber = None):
+
+		if trialNumber != None :
+			self.changeTrialNumber(trialNumber)
+
+
+		# CCD folder for the graphs at each angle
+
+		if not os.path.exists(self.pathway + '/IntermediatePhotons/graphs/CCD'):
+			os.mkdir(self.pathway + '/IntermediatePhotons/graphs/CCD')
+
+
+		numAngles = self.numFitsFiles()
+
+
+		# Find the maximum probability over all angles:
+		maxprob = 0
+		for k in range(0, numAngles):
+			photonTable = Table.read(self.pathway+ '/IntermediatePhotons/Angle' + str(k+1) + 'of' +str(numAngles) + '.fits')
+
+			if len(photonTable) > 0:
+				localmax = np.max(photonTable['probability'])
+
+				if localmax > maxprob:
+					maxprob = localmax
+
+		tenth = maxprob / 10
+
+
+		# Make the graphs
+
+		for i in range(0, numAngles):
+			# For this angle Graph...
+			photonTable = Table.read(self.pathway + '/IntermediatePhotons/Angle' + str(i+1) + 'of' +str(numAngles) + '.fits')
+
+			plt.clf()
+
+
+			# Now graph each decile on the same graph
+			photons = photonTable.copy()
+
+
+			# Graph each decile of probability with a different opacity
+			for j in range(0,10):
+
+				photonsToGraph = photons[photons['probability'] <= ((j+1)*tenth)] # upper limit
+
+				photonsToGraph = photonsToGraph[photonsToGraph['probability'] > (j*tenth)] #lower limit
+
+				if len(photonsToGraph) >0 :
+					opacity = ((j+1)*tenth/maxprob)
+					if (opacity > 1.0):
+						opacity = 1
+					plt.scatter(photonsToGraph['det_x'], photonsToGraph['det_y'], alpha = opacity)
+
+			plt.xlabel('x-axis-mm')
+			plt.ylabel('y-axis-mm')
+			plt.xlim( -15*3, 15*3)
+			plt.ylim(-15*3,15*3)
+
+			#True detector size is 12.288 x 12.288
+			# CCD borders:
+			plt.plot([12.288,12.288,-12.288,-12.288, 12.288], [-12.288,12.288,12.288,-12.288, -12.288], linestyle='-', color = 'r')
+
+			plt.savefig(self.pathway+ '/IntermediatePhotons/graphs/CCD/Angle' + str(i+1) )
+
+
+
+		def hist(self, trialNumber = None):
+
+			if trialNumber != None :
+				self.changeTrialNumber(trialNumber)
+
 
 
 
