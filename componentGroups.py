@@ -1,5 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.path import Path
+import matplotlib.patches as patches
 #import marxs.visualization.mayavi
 #from mayavi import mlab
 #from mpl_toolkits.mplot3d import axes3d
@@ -699,6 +701,9 @@ class graphs():
 					opacity = ((j+1)*tenth/maxprob)
 					if (opacity > 1.0):
 						opacity = 1
+
+
+
 					plt.scatter(photonsToGraph['det_x'], photonsToGraph['det_y'], alpha = opacity)
 
 			plt.xlabel('x-axis-mm')
@@ -804,6 +809,9 @@ class graphs():
 					opacity = ((j+1)*tenth/maxprob)
 					if (opacity > 1.0):
 						opacity = 1
+
+
+
 					plt.scatter(photonsToGraph['det_x'], photonsToGraph['det_y'], alpha = opacity)
 
 			plt.xlabel('x-axis-mm')
@@ -819,10 +827,121 @@ class graphs():
 
 
 
-		def hist(self, trialNumber = None):
+	def hist(self, trialNumber = None):
 
-			if trialNumber != None :
-				self.changeTrialNumber(trialNumber)
+		if trialNumber != None :
+			self.changeTrialNumber(trialNumber)
+
+		numAngles = self.numFitsFiles()
+
+
+		if not os.path.exists(self.pathway + '/DetectedPhotons/graphs/Histogram'):
+			os.mkdir(self.pathway + '/DetectedPhotons/graphs/Histogram')
+
+
+
+		#make a bin for each pixel on the CCD.
+
+		#binsize = 1 mm
+		# i -- table increment, j-- x increment, k-- y increment
+		for i in range(0, numAngles):
+			photonTable = Table.read(self.pathway + '/DetectedPhotons/Angle' + str(i+1) + 'of' +str(numAngles) + '.fits')
+			xMin = int(np.min(photonTable['det_x']))
+			xMax = int(np.max(photonTable['det_x']))
+			yMin = int(np.min(photonTable['det_y']))
+			yMax = int(np.max(photonTable['det_x']))
+
+			numXBins = xMax - xMin
+			numYBins = yMax - yMin
+
+			totalProbabilities = np.empty([numXBins, numYBins])
+
+			for j in range(0,numXBins):
+
+				photons = photonTable.copy()
+
+				photons = photons[photons['det_x'] > (j + xMin)]
+				photons = photons[photons['det_x'] < (j+1+xMin)]
+
+				for k in range(0, numYBins):
+					photonRegion = photons.copy()
+
+					photonRegion = photonRegion[photonRegion['det_y'] > (k + yMin)]
+
+					photonRegion = photonRegion[photonRegion['det_y'] < (k+1 + yMin)]
+
+					totalProb = np.sum(photonRegion['probability'])
+
+					totalProbabilities[j][k] = totalProb
+
+
+			# Now we have an array of the probabilities in each region.
+
+			maxprob = np.max(totalProbabilities)
+
+			plt.clf()
+
+			for j in range(0, numXBins):
+				lowerX = xMin + j
+				upperX = xMin + j + 1
+				for k in range(0, numYBins):
+					lowerY = yMin + k
+					upperY = yMin + k + 1
+
+					currentProb = totalProbabilities[j][k]
+
+					if (currentProb/ maxprob) <= 0.1:
+						color = '#FF4D65'
+					elif (currentProb/ maxprob) <= 0.2:
+						color = '#F57742'
+					elif (currentProb / maxprob) <= 0.3:
+						color = '#EBBA38'
+					elif (currentProb/ maxprob) <= 0.4:
+						color = '#C6E12F'
+					elif (currentProb/ maxprob) <= 0.5:
+						color = '#71D827'
+					elif (currentProb / maxprob) <= 0.6:
+						color = '#1FCE21'
+					elif (currentProb / maxprob) <= 0.7:
+						color = '#17C464'
+					elif (currentProb / maxprob) <= 0.8:
+						color = '#10BBA5'
+					elif (currentProb / maxprob) <= 0.9:
+						color = '#0A7FB1'
+					else:
+						color = '#19009E'
+
+
+
+					xCenter = (lowerX + upperX) / 2
+					yCenter = (lowerY + upperY) / 2
+					plt.plot(xCenter, yCenter)
+
+		
+
+			plt.xlabel('x-axis-mm')
+			plt.ylabel('y-axis-mm')
+			plt.xlim( -15*3, 15*3)
+			plt.ylim(-15*3,15*3)
+
+			#True detector size is 12.288 x 12.288
+			# CCD borders:
+			plt.plot([12.288,12.288,-12.288,-12.288, 12.288], [-12.288,12.288,12.288,-12.288, -12.288], linestyle='-', color = 'r')
+
+			plt.savefig(self.pathway+ '/DetectedPhotons/graphs/Histogram/Angle' + str(i+1) )
+
+
+
+
+
+
+			
+
+
+
+
+				
+
 
 
 
