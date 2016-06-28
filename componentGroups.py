@@ -840,7 +840,7 @@ class graphs():
 
 
 
-		#make a bin for each pixel on the CCD.
+		#make a bin for each mm on the CCD.
 
 		#binsize = 1 mm
 		# i -- table increment, j-- x increment, k-- y increment
@@ -849,7 +849,7 @@ class graphs():
 			xMin = int(np.min(photonTable['det_x']))
 			xMax = int(np.max(photonTable['det_x']))
 			yMin = int(np.min(photonTable['det_y']))
-			yMax = int(np.max(photonTable['det_x']))
+			yMax = int(np.max(photonTable['det_y']))
 
 			numXBins = xMax - xMin
 			numYBins = yMax - yMin
@@ -877,9 +877,13 @@ class graphs():
 
 			# Now we have an array of the probabilities in each region.
 
-			maxprob = np.max(totalProbabilities)
+			
 
 			plt.clf()
+			j = 0
+			k = 0
+			if len(totalProbabilities >0):
+				maxprob = np.max(totalProbabilities)
 
 			for j in range(0, numXBins):
 				lowerX = xMin + j
@@ -908,14 +912,16 @@ class graphs():
 						color = '#10BBA5'
 					elif (currentProb / maxprob) <= 0.9:
 						color = '#0A7FB1'
-					else:
+					elif (currentProb / maxprob) > 0.9:
 						color = '#19009E'
+					else:
+						color = '#FF4D65'
 
 
 
 					xCenter = (lowerX + upperX) / 2
 					yCenter = (lowerY + upperY) / 2
-					plt.plot(xCenter, yCenter)
+					plt.plot(xCenter, yCenter, 's', color = color, markersize = 4)
 
 		
 
@@ -929,6 +935,8 @@ class graphs():
 			plt.plot([12.288,12.288,-12.288,-12.288, 12.288], [-12.288,12.288,12.288,-12.288, -12.288], linestyle='-', color = 'r')
 
 			plt.savefig(self.pathway+ '/DetectedPhotons/graphs/Histogram/Angle' + str(i+1) )
+
+			i,j,k = 0,0,0
 
 
 
