@@ -8,6 +8,7 @@ import matplotlib.patches as patches
 from astropy.table import Table, Column, vstack
 from transforms3d.euler import euler2mat
 from transforms3d.affines import compose, decompose
+from transforms3d.axangles import axangle2mat
 
 import os
 import datetime
@@ -189,6 +190,9 @@ class SourceMLMirror(OpticalElement):
 	def offset_apparatus(self,offsetMatrix):
 		self.pos4d = np.dot(offsetMatrix, self.defaultApparatusPos4d)
 
+	def move_apparatus(self, moveMatrix):
+		self.pos4d = np.dot(moveMatrix, self.pos4d)
+
 
 
 
@@ -328,10 +332,12 @@ class staticSimulation():
 		self.first = SourceMLMirror(firstMirrorREFL, firstMirrorPOL)
 		self.second = MLMirrorDetector(secondMirrorREFL, secondMirrorPOL)
 
-	def offset_angle(self, angle):
+	def offset_angle(self, angle, axis = [1,0,0]):
 		self.angleOffset = angle
 
-		Rotation = euler2mat(0,angle,0,"syxz")
+		axis = np.array(axis)
+
+		Rotation = axangle2mat(axis, angle)
 
 		currentPosition, currentRotation, currentZoom, currentShear = decompose(self.first.pos4d)
 
@@ -348,6 +354,7 @@ class staticSimulation():
 		matrix = compose( position, currentRotation, [1,1,1], [0,0,0])
 
 		self.first.offset_apparatus(matrix)
+
 
 
 
@@ -442,7 +449,7 @@ class rotation():
 		os.mkdir('./RotatingSimulationTrials/Trial' + str(trialNumber) + '/IntermediatePhotons')
 
 
-	def run(self, staticSimulation, numAngles = 3, exposureTime = 1000, intermediates = False):
+	def run(self, staticSimulation, numAngles = 3, exposureTime = 1000, intermediates = False, rotationAxis = [1,0,0]):
 
 
 
@@ -473,7 +480,7 @@ class rotation():
 			angle = i * (2*np.pi/numAngles)
 			print "\nRunning Angle: " + str(angle) + "..."
 
-			sim.offset_angle(angle)
+			sim.offset_angle(angle, rotationAxis)
 
 			if intermediates:
 				results, intermediatePhotons = sim.run(exposureTime, intermediates)
@@ -504,16 +511,18 @@ class rotation():
 
 
 		# Record Trial Data:
-		self.writeTrialDetails('./RotatingSimulationTrials/Trial' + str(self.trialNumber) , sim, numAngles, exposureTime, runTime, intermediates )
+		self.writeTrialDetails('./RotatingSimulationTrials/Trial' + str(self.trialNumber) , sim, numAngles, exposureTime, runTime, intermediates, rotationAxis )
 
 		return [angles, probabilities]
 
-	def writeTrialDetails(self, pathway, simulation, numAngles, exposureTime, runtime, intermediates):
+
+	def writeTrialDetails(self, pathway, simulation, numAngles, exposureTime, runtime, intermediates, rotationAxis):
 
 		trialDetailsFile = open( pathway + "/trialDetails.txt", "w")
 
 		trialDetailsFile.write("Trial Number: " + str(self.trialNumber) + "    " + str(datetime.datetime.now()) + "\n")
 		trialDetailsFile.write("Type: rotation of first half of simulation\n")
+		trialDetailsFile.write("Axis of Rotation: " + str(rotationAxis) + '\n')
 		trialDetailsFile.write("IntermediatePhotons Recorded: " + str(intermediates) + '\n')
 		trialDetailsFile.write("Runtime: " + str(runtime) + '\n\n\n')
 		trialDetailsFile.write("Details:\n")
@@ -805,14 +814,13 @@ class graphs():
 
 				photonsToGraph = photonsToGraph[photonsToGraph['probability'] > (j*tenth)] #lower limit
 
-				if len(photonsToGraph) >0 :
+				if len(photonsToGraph) > 1 :
 					opacity = ((j+1)*tenth/maxprob)
 					if (opacity > 1.0):
 						opacity = 1
 
-
-
-					plt.scatter(photonsToGraph['det_x'], photonsToGraph['det_y'], alpha = opacity)
+					if ('det_x' in photonsToGraph.columns):
+						plt.scatter(photonsToGraph['det_x'], photonsToGraph['det_y'], alpha = opacity)
 
 			plt.xlabel('x-axis-mm')
 			plt.ylabel('y-axis-mm')
