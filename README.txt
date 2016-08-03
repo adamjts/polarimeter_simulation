@@ -44,3 +44,5 @@ ComponentGroups.py
 ComponentGroupsDocs
 
 sample_rotation_data
+
+Rotation_Sim_Report
