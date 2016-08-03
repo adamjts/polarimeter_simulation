@@ -1,11 +1,14 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.path import Path
+import matplotlib.patches as patches
 #import marxs.visualization.mayavi
 #from mayavi import mlab
 #from mpl_toolkits.mplot3d import axes3d
 from astropy.table import Table, Column, vstack
 from transforms3d.euler import euler2mat
 from transforms3d.affines import compose, decompose
+from transforms3d.axangles import axangle2mat
 
 import os
 import datetime
@@ -187,6 +190,9 @@ class SourceMLMirror(OpticalElement):
 	def offset_apparatus(self,offsetMatrix):
 		self.pos4d = np.dot(offsetMatrix, self.defaultApparatusPos4d)
 
+	def move_apparatus(self, moveMatrix):
+		self.pos4d = np.dot(moveMatrix, self.pos4d)
+
 
 
 
@@ -326,10 +332,12 @@ class staticSimulation():
 		self.first = SourceMLMirror(firstMirrorREFL, firstMirrorPOL)
 		self.second = MLMirrorDetector(secondMirrorREFL, secondMirrorPOL)
 
-	def offset_angle(self, angle):
+	def offset_angle(self, angle, axis = [1,0,0]):
 		self.angleOffset = angle
 
-		Rotation = euler2mat(0,angle,0,"syxz")
+		axis = np.array(axis)
+
+		Rotation = axangle2mat(axis, angle)
 
 		currentPosition, currentRotation, currentZoom, currentShear = decompose(self.first.pos4d)
 
@@ -346,6 +354,7 @@ class staticSimulation():
 		matrix = compose( position, currentRotation, [1,1,1], [0,0,0])
 
 		self.first.offset_apparatus(matrix)
+
 
 
 
@@ -440,7 +449,7 @@ class rotation():
 		os.mkdir('./RotatingSimulationTrials/Trial' + str(trialNumber) + '/IntermediatePhotons')
 
 
-	def run(self, staticSimulation, numAngles = 3, exposureTime = 1000, intermediates = False):
+	def run(self, staticSimulation, numAngles = 3, exposureTime = 1000, intermediates = False, rotationAxis = [1,0,0]):
 
 
 
@@ -471,7 +480,7 @@ class rotation():
 			angle = i * (2*np.pi/numAngles)
 			print "\nRunning Angle: " + str(angle) + "..."
 
-			sim.offset_angle(angle)
+			sim.offset_angle(angle, rotationAxis)
 
 			if intermediates:
 				results, intermediatePhotons = sim.run(exposureTime, intermediates)
@@ -502,16 +511,18 @@ class rotation():
 
 
 		# Record Trial Data:
-		self.writeTrialDetails('./RotatingSimulationTrials/Trial' + str(self.trialNumber) , sim, numAngles, exposureTime, runTime, intermediates )
+		self.writeTrialDetails('./RotatingSimulationTrials/Trial' + str(self.trialNumber) , sim, numAngles, exposureTime, runTime, intermediates, rotationAxis )
 
 		return [angles, probabilities]
 
-	def writeTrialDetails(self, pathway, simulation, numAngles, exposureTime, runtime, intermediates):
+
+	def writeTrialDetails(self, pathway, simulation, numAngles, exposureTime, runtime, intermediates, rotationAxis):
 
 		trialDetailsFile = open( pathway + "/trialDetails.txt", "w")
 
 		trialDetailsFile.write("Trial Number: " + str(self.trialNumber) + "    " + str(datetime.datetime.now()) + "\n")
 		trialDetailsFile.write("Type: rotation of first half of simulation\n")
+		trialDetailsFile.write("Axis of Rotation: " + str(rotationAxis) + '\n')
 		trialDetailsFile.write("IntermediatePhotons Recorded: " + str(intermediates) + '\n')
 		trialDetailsFile.write("Runtime: " + str(runtime) + '\n\n\n')
 		trialDetailsFile.write("Details:\n")
@@ -699,6 +710,9 @@ class graphs():
 					opacity = ((j+1)*tenth/maxprob)
 					if (opacity > 1.0):
 						opacity = 1
+
+
+
 					plt.scatter(photonsToGraph['det_x'], photonsToGraph['det_y'], alpha = opacity)
 
 			plt.xlabel('x-axis-mm')
@@ -800,11 +814,13 @@ class graphs():
 
 				photonsToGraph = photonsToGraph[photonsToGraph['probability'] > (j*tenth)] #lower limit
 
-				if len(photonsToGraph) >0 :
+				if len(photonsToGraph) > 1 :
 					opacity = ((j+1)*tenth/maxprob)
 					if (opacity > 1.0):
 						opacity = 1
-					plt.scatter(photonsToGraph['det_x'], photonsToGraph['det_y'], alpha = opacity)
+
+					if ('det_x' in photonsToGraph.columns):
+						plt.scatter(photonsToGraph['det_x'], photonsToGraph['det_y'], alpha = opacity)
 
 			plt.xlabel('x-axis-mm')
 			plt.ylabel('y-axis-mm')
@@ -819,10 +835,129 @@ class graphs():
 
 
 
-		def hist(self, trialNumber = None):
+	def hist(self, trialNumber = None):
 
-			if trialNumber != None :
-				self.changeTrialNumber(trialNumber)
+		if trialNumber != None :
+			self.changeTrialNumber(trialNumber)
+
+		numAngles = self.numFitsFiles()
+
+
+		if not os.path.exists(self.pathway + '/DetectedPhotons/graphs/Histogram'):
+			os.mkdir(self.pathway + '/DetectedPhotons/graphs/Histogram')
+
+
+
+		#make a bin for each mm on the CCD.
+
+		#binsize = 1 mm
+		# i -- table increment, j-- x increment, k-- y increment
+		for i in range(0, numAngles):
+			photonTable = Table.read(self.pathway + '/DetectedPhotons/Angle' + str(i+1) + 'of' +str(numAngles) + '.fits')
+			xMin = int(np.min(photonTable['det_x']))
+			xMax = int(np.max(photonTable['det_x']))
+			yMin = int(np.min(photonTable['det_y']))
+			yMax = int(np.max(photonTable['det_y']))
+
+			numXBins = xMax - xMin
+			numYBins = yMax - yMin
+
+			totalProbabilities = np.empty([numXBins, numYBins])
+
+			for j in range(0,numXBins):
+
+				photons = photonTable.copy()
+
+				photons = photons[photons['det_x'] > (j + xMin)]
+				photons = photons[photons['det_x'] < (j+1+xMin)]
+
+				for k in range(0, numYBins):
+					photonRegion = photons.copy()
+
+					photonRegion = photonRegion[photonRegion['det_y'] > (k + yMin)]
+
+					photonRegion = photonRegion[photonRegion['det_y'] < (k+1 + yMin)]
+
+					totalProb = np.sum(photonRegion['probability'])
+
+					totalProbabilities[j][k] = totalProb
+
+
+			# Now we have an array of the probabilities in each region.
+
+			
+
+			plt.clf()
+			j = 0
+			k = 0
+			if len(totalProbabilities >0):
+				maxprob = np.max(totalProbabilities)
+
+			for j in range(0, numXBins):
+				lowerX = xMin + j
+				upperX = xMin + j + 1
+				for k in range(0, numYBins):
+					lowerY = yMin + k
+					upperY = yMin + k + 1
+
+					currentProb = totalProbabilities[j][k]
+
+					if (currentProb/ maxprob) <= 0.1:
+						color = '#FF4D65'
+					elif (currentProb/ maxprob) <= 0.2:
+						color = '#F57742'
+					elif (currentProb / maxprob) <= 0.3:
+						color = '#EBBA38'
+					elif (currentProb/ maxprob) <= 0.4:
+						color = '#C6E12F'
+					elif (currentProb/ maxprob) <= 0.5:
+						color = '#71D827'
+					elif (currentProb / maxprob) <= 0.6:
+						color = '#1FCE21'
+					elif (currentProb / maxprob) <= 0.7:
+						color = '#17C464'
+					elif (currentProb / maxprob) <= 0.8:
+						color = '#10BBA5'
+					elif (currentProb / maxprob) <= 0.9:
+						color = '#0A7FB1'
+					elif (currentProb / maxprob) > 0.9:
+						color = '#19009E'
+					else:
+						color = '#FF4D65'
+
+
+
+					xCenter = (lowerX + upperX) / 2
+					yCenter = (lowerY + upperY) / 2
+					plt.plot(xCenter, yCenter, 's', color = color, markersize = 4)
+
+		
+
+			plt.xlabel('x-axis-mm')
+			plt.ylabel('y-axis-mm')
+			plt.xlim( -15*3, 15*3)
+			plt.ylim(-15*3,15*3)
+
+			#True detector size is 12.288 x 12.288
+			# CCD borders:
+			plt.plot([12.288,12.288,-12.288,-12.288, 12.288], [-12.288,12.288,12.288,-12.288, -12.288], linestyle='-', color = 'r')
+
+			plt.savefig(self.pathway+ '/DetectedPhotons/graphs/Histogram/Angle' + str(i+1) )
+
+			i,j,k = 0,0,0
+
+
+
+
+
+
+			
+
+
+
+
+				
+
 
 
 
