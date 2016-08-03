@@ -1,4 +1,4 @@
-Jason Frost
+Jason Frost (summer 2015)
 
 polarimeter_simulation
 
@@ -37,6 +37,10 @@ corresponding graphs of those arrays. Some simulated images are also included.
 
 *********************************************************************************
 
-Adam Theriault-Shay
+Adam Theriault-Shay (summer 2016)
 
 ComponentGroups.py
+
+ComponentGroupsDocs
+
+sample_rotation_data
