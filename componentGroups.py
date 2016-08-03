@@ -28,8 +28,32 @@ from energyDistributions import createEnergyTable
 
 
 class SourceMLMirror(OpticalElement):
-	#this will also alllow the elements to wiggle later. RN it goes light source --> MLMirror
-	# The mirror is at the center of this object
+	'''
+	This is a point-cone source combined with a multilayer mirror. Its purpose is to simulate a polarized light source.
+
+	Z+ is out of the screen. X+ is to the right. Y+ is upwards.
+
+		   Source
+		   	|
+		   	|
+		   	|
+		   	MLMirror------>
+
+		   	self.pos4d is a record of all the transformations on the ENTIRE setup as a whole.
+		   	The source comes in by default from the local y direction.
+		   	The photons exit by default in the local x direction
+
+	Parameters
+	----------
+	reflFile:
+		This is the pathway to the data file for the multiLayerMirror. 
+	testedPolarization:
+		This is the pathway to the polarization data file for the multilayer.
+	openningAngle:
+		steradians that span the range of directions for which the photons will randomly be generated
+	sourceDistance:
+		distance between the source and multilayer (mm)
+	'''
 
 	def defaultSource(self, openningAngle, sourceDistance):
 
@@ -198,7 +222,28 @@ class SourceMLMirror(OpticalElement):
 
 
 class MLMirrorDetector(OpticalElement):
+	'''
+	This is a CCD combined with a multilayer mirror. Its purpose is to filter the light that hits the CCD by poalrization
+	
+	Default Setup:
+		Z+ is out of the screen. X+ is to the right. Y+ is upwards.
 
+		   			CCD
+		   			/|\
+		   			 |
+		   			 |
+		   	------>MLMirror
+
+
+	Parameters
+	----------
+	reflFile:
+		This is the pathway to the data file for the multiLayerMirror. 
+	testedPolarization:
+		This is the pathway to the polarization data file for the multilayer.
+	detectorDistance:
+		the distance the CCD is from the multilayer.
+	'''
 	def defaultMirror(self,reflFile, testedPolarization):
 		#mirrorData Defaults - reference files
 		self.reflFile = reflFile
@@ -306,6 +351,25 @@ class MLMirrorDetector(OpticalElement):
 
 class staticSimulation():
 
+	'''
+	This class is composed of two subclasses (stages). The first stage is SourceMLMirror, the second stage is MLMirrorDetector.
+	This allows a full trial to be run within one class. If the beamline is the beam of photons traveling between the first and second stage,
+	then offset_angle rotates the first stage about the beamline axis. This illuminantes the effects of polarization at different angles.
+	Layout:
+
+	(first)						  (second)
+    --------------------------------------
+    Source                        Detector
+      |                              ^
+      |                             /|\
+     \|/                             |
+      v                              |
+    Mirror  ->   (BEAMLINE)    ->   Mirror
+    --------------------------------------
+
+    Modification of setup is done through the functions within the two subclasses (ex. simulation.first.offset_mirror(Matrix)).
+	'''
+
 	def __init__(self, firstMirrorREFL = './mirror_files/A12113.txt', firstMirrorPOL = './mirror_files/ALSPolarization.txt', secondMirrorREFL= './mirror_files/A12113.txt', secondMirrorPOL = './mirror_files/ALSPolarization.txt'):
 
 		self.first = SourceMLMirror(firstMirrorREFL, firstMirrorPOL)
@@ -400,6 +464,14 @@ class staticSimulation():
 			return self.results
 
 class rotation():
+
+	'''
+	This class enables a simulation composed of multiple static simulations. It iterates over static simulations at different offset angles.
+	It also generates a file system for trial data storage. It also generates a text file with all the relevant simulation geometries and parameters.
+
+	'''
+
+
 	def __init__(self):
 		#self.numberOfAngles = 3 #NUMBER OF ANLGES THAT WILL BE TESTED
 		#self.exposureTime = 1000
@@ -450,6 +522,24 @@ class rotation():
 
 
 	def run(self, staticSimulation, numAngles = 3, exposureTime = 1000, intermediates = False, rotationAxis = [1,0,0]):
+
+		'''
+		Runs multiple static simulations and records the data.
+
+		Prameters:
+		---------
+		staticSimulation:
+			this is a static simulation object. It can be configured with any desired geometry before being passed into the rotation object.
+		numAngles:
+			number of angles to be tested. They will be evenly spaced along a full rotation
+		exposureTime:
+			exposureTime per angle
+		intermediates:
+			boolean, indicating whether or not to store the intermediate photons. The intermediate photons are the photon tables of the photons that are
+			half way between the two multilayer mirrors along the beamline
+		rotation Axis:
+			can choose to rotate along a different axis (defaults to beamline (x) axis.)
+		'''
 
 
 
@@ -576,6 +666,12 @@ class graphs():
 	# This will have methods to generate common graphs of interest
 
 	def __init__(self, trialNumber):
+
+		'''
+		Generates graphs and stores them for a given trial. One can graph the probability spacial distributions with histograms, and can look at 
+		total probabilities by angle to gauge brightness for certain rotation angles. Can change trial number with any of the graphing functions
+		and trial number as parameter. If no trial number is given, it will default to the previosly graphed trial number (or trial number during initialization).
+		'''
 
 
 		self.trialNumber = trialNumber
@@ -967,7 +1063,7 @@ class graphs():
 
 
 
-
+'''
 
 
 class rayTrace():
@@ -1023,7 +1119,7 @@ class rayTrace():
 
 
 
-
+'''
 
 
 
